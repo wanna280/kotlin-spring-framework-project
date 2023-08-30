@@ -5,7 +5,7 @@ plugins {
 }
 
 allprojects {
-    group = "com.wanna"
+    group = "com.wanna.spring"
     version = "1.0-SNAPSHOT"
 
     repositories {
