@@ -30,8 +30,8 @@ object AutowireUtils {
         // 那么我们需要使用ObjectFactory.getObject去转换成为目标类型去进行注入
         if (autowireValue is ObjectFactory<*> && !requiredType.isInstance(autowireValue)) {
 
-            // 如果autowireValue是Serializable的, 但是requiredType是一个接口的话
-            // 那么我们需要使用JDK动态代理去生成一个代理对象去委托一层...
+            // 如果autowireValue是Serializable的, 并且requiredType是一个接口的话
+            // 那么我们需要使用JDK动态代理去生成一个代理对象去委托一层, 包装返回的对象, 保证它可以被正常序列
             if (autowireValue is Serializable && requiredType.isInterface) {
                 return Proxy.newProxyInstance(
                     requiredType.classLoader,
@@ -53,8 +53,10 @@ object AutowireUtils {
             when (method.name) {
                 "equals" ->
                     return proxy === args[0]
+
                 "hashCode" ->
                     return System.identityHashCode(proxy)
+
                 "toString" -> return objectFactory.toString()
             }
             return try {
