@@ -38,16 +38,12 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
     companion object {
         /**
          * javax.inject.Provider--->对应于Spring家的ObjectProvider
+         *
+         * @see com.wanna.framework.beans.factory.ObjectProvider
          */
         @Nullable
         @JvmStatic
         private var javaxInjectProviderClass: Class<*>? = null
-
-        /**
-         * Logger
-         */
-        @JvmStatic
-        private val logger = LoggerFactory.getLogger(DefaultListableBeanFactory::class.java)
 
         init {
             try {
@@ -289,88 +285,44 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
     private interface BeanObjectProvider<T : Any> : ObjectProvider<T>, java.io.Serializable
 
     /**
-     * 方便去进行内部的依赖的解析, 因此, 这里需要将ObjectFactory的泛型类型去进行作为真正的依赖类型, 这里我们进行包装一下
-     */
-    private class InnerDependencyDescriptor(
-        private val descriptor: DependencyDescriptor, private val type: ResolvableType,
-    ) : DependencyDescriptor(null, null, false, false) {
-
-        /**
-         * 它是否是必须的?
-         */
-        private var required: Boolean? = null
-
-        // 如果指定了required, 那么使用自定义的, 不然就使用origin的
-        constructor(descriptor: DependencyDescriptor, type: ResolvableType, required: Boolean) : this(
-            descriptor, type
-        ) {
-            this.required = required
-        }
-
-        override fun getMethodParameter() = descriptor.getMethodParameter()
-
-        override fun getAnnotations() = descriptor.getAnnotations()
-
-        override fun <T : Annotation> getAnnotation(annotationClass: Class<T>) =
-            descriptor.getAnnotation(annotationClass)
-
-        override fun initParameterNameDiscoverer(parameterNameDiscoverer: ParameterNameDiscoverer?) =
-            descriptor.initParameterNameDiscoverer(parameterNameDiscoverer)
-
-        override fun getGenericType() = descriptor.getGenericType()
-
-        override fun getContainingClass() = descriptor.getContainingClass()
-
-        override fun setContainingClass(containingClass: Class<*>?) = descriptor.setContainingClass(containingClass)
-
-        override fun getParameterIndex() = descriptor.getParameterIndex()
-
-        override fun getMethodName() = descriptor.getMethodName()
-
-        override fun getDeclaringClass() = descriptor.getDeclaringClass()
-
-        override fun getParameterTypes() = descriptor.getParameterTypes()
-
-        override fun getFieldName() = descriptor.getFieldName()
-
-        override fun isRequired() = required ?: descriptor.isRequired()
-
-        override fun isEager() = descriptor.isEager()
-
-        override fun getDependencyType(): Class<*> = type.resolve()!!
-
-        override fun getResolvableType() = type
-    }
-
-    /**
      * 用来完成Dependency的解析的ObjectProvider, 为获取Java对象提供懒加载的机制去进行实现
      *
      * @param originDescriptor 原始依赖描述符
      * @param beanName beanName
-     * @param asTarget 要使用哪个父类的泛型类型去进行寻找?
      */
     private open inner class DependencyObjectProvider(
-        private val originDescriptor: DependencyDescriptor, @Nullable private val beanName: String?, asTarget: Class<*>
+        private val originDescriptor: DependencyDescriptor, @Nullable private val beanName: String?
     ) : BeanObjectProvider<Any> {
 
         /**
-         * 获取asTarget的泛型类型...
+         * 嵌套解析泛型的依赖描述符, ObjectProvider/ObjectFactory指定了泛型,
+         * 这里的descriptor描述的就是泛型的类型信息
          */
-        private val type = originDescriptor.getResolvableType().`as`(asTarget).getGenerics()[0]
+        private val descriptor = NestedDependencyDescriptor(originDescriptor);
 
+        /**
+         * ObjectFactory获取对象的工厂方法
+         *
+         * @return 依赖对象
+         */
         override fun getObject(): Any {
-            val descriptorToUse = InnerDependencyDescriptor(originDescriptor, type)
-            return doResolveDependency(descriptorToUse, beanName, null, null) ?: throw NoSuchBeanDefinitionException(
-                originDescriptor.getResolvableType().toString()
-            )
+            return doResolveDependency(descriptor, beanName, null, null)
+                ?: throw NoSuchBeanDefinitionException(this.descriptor.getResolvableType().toString())
         }
 
         /**
          * 如果能够解析到依赖的话, return解析到的依赖; 如果无法解析到该依赖的话, return null
+         *
+         * @return 解析到的依赖(or null)
          */
         override fun getIfAvailable(): Any? {
             return try {
-                val descriptorToUse = InnerDependencyDescriptor(originDescriptor, type, false)
+                // 创建一个新的DependencyDescriptor进行浅拷贝, 并将required去设置为false...
+                val descriptorToUse = object : DependencyDescriptor(descriptor) {
+                    override fun isRequired(): Boolean {
+                        return false
+                    }
+                }
                 doResolveDependency(descriptorToUse, beanName, null, null)
             } catch (ex: Exception) {
                 null
@@ -393,7 +345,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
      * Jsr330的Provider的实现, 通过继承DependencyObjectProvider去完成
      */
     private inner class Jsr330Provider(descriptor: DependencyDescriptor, @Nullable beanName: String?) :
-        DependencyObjectProvider(descriptor, beanName, javaxInjectProviderClass!!), Provider<Any> {
+        DependencyObjectProvider(descriptor, beanName), Provider<Any> {
         override fun get(): Any {
             return getObject()
         }
@@ -433,8 +385,10 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
         if (descriptor.getDependencyType() == Optional::class.java) {
             return createOptionalDependency(descriptor, requestingBeanName)
             // 如果要求注入的是一个ObjectFactory/ObjectProvider的话, 那么统一去进行构建一个ObjectProvider(ObjectProvider是ObjectFactory的子接口)
-        } else if (descriptor.getDependencyType() == ObjectFactory::class.java || descriptor.getDependencyType() == ObjectProvider::class.java) {
-            return DependencyObjectProvider(descriptor, requestingBeanName, ObjectFactory::class.java)
+        } else if (descriptor.getDependencyType() == ObjectFactory::class.java
+            || descriptor.getDependencyType() == ObjectProvider::class.java
+        ) {
+            return DependencyObjectProvider(descriptor, requestingBeanName)
 
             // 如果要求注入的是Jsr330的Provider, 那么在这里去进行create
         } else if (descriptor.getDependencyType() == javaxInjectProviderClass) {
@@ -642,7 +596,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
     private fun createOptionalDependency(
         descriptor: DependencyDescriptor, @Nullable requestingBeanName: String?
     ): Optional<*> {
-        val available = DependencyObjectProvider(descriptor, requestingBeanName, Optional::class.java).getIfAvailable()
+        val available = DependencyObjectProvider(descriptor, requestingBeanName).getIfAvailable()
         return Optional.ofNullable(available)
     }
 
