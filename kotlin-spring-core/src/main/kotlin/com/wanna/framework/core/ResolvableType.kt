@@ -88,7 +88,7 @@ open class ResolvableType {
     }
 
     /**
-     * 根据type, 去执行对于Class的解析
+     * 根据type, 去执行对于[Class]的解析
      *
      * @return 解析得到的Class
      */
@@ -132,7 +132,7 @@ open class ResolvableType {
     }
 
     /**
-     * 返回解析完成得到的Class, 如果没有已经完成解析的Class, 那么返回Object.class
+     * 返回解析完成得到的[Class], 如果没有已经完成解析的[Class], 那么返回Object.class
      *
      * @return 已经完成解析的Class(或者Object.class)
      */
@@ -230,9 +230,9 @@ open class ResolvableType {
     }
 
     /**
-     * 获取该类型对应的泛型列表
+     * 获取该类型[ResolvableType]对应的泛型列表
      *
-     * @return 泛型列表
+     * @return 当前类型的泛型列表
      */
     open fun getGenerics(): Array<ResolvableType> {
         if (this == NONE) {
@@ -261,6 +261,13 @@ open class ResolvableType {
         return generics
     }
 
+    /**
+     * 解析泛型参数, 对每一个泛型参数去resolve去解析成为Class
+     *
+     * @return 泛型参数列表
+     * @see getGenerics
+     * @see resolve
+     */
     open fun resolveGenerics(): Array<Class<*>?> {
         val generics = getGenerics()
         return Array(generics.size) { generics[it].resolve() }
@@ -270,18 +277,43 @@ open class ResolvableType {
         return getGeneric(*indexes).resolve()
     }
 
+    /**
+     * 检查当前[ResolvableType], 是否存在有泛型参数
+     *
+     * @return 当前ResolvableType有泛型参数return true; 否则return false
+     */
     open fun hasGenerics(): Boolean {
         return getGenerics().isNotEmpty()
     }
 
+    /**
+     * 提供对于[Collection]的泛型解析的快捷方法, 如果当前类型没有实现[Collection]接口的话,
+     * 那么返回[NONE]
+     *
+     * @return Collection的ResolvableType(or NONE)
+     * @see as
+     * @see asMap
+     */
     open fun asCollection(): ResolvableType {
         return `as`(Collection::class.java)
     }
 
+    /**
+     * 提供对于[Map]的泛型解析的快捷方法, 如果当前类型没有实现[Map]接口的话, 那么返回[NONE]
+     *
+     * @return Map的ResolvableType(or NONE)
+     * @see as
+     * @see asMap
+     */
     open fun asMap(): ResolvableType {
         return `as`(Map::class.java)
     }
 
+    /**
+     * 获取到数组的元素类型[ResolvableType], 如果不存在的话, return NONE
+     *
+     * @return 数组的元素类型的ResolvableType(or NONE)
+     */
     open fun getComponentType(): ResolvableType {
         if (this == NONE) {
             return NONE
@@ -299,6 +331,11 @@ open class ResolvableType {
         return resolveType().getComponentType()
     }
 
+    /**
+     * 检查当前[ResolvableType]类型, 是否是数组
+     *
+     * @return 当前是数组的话, return true; 不是数组的话, return false
+     */
     open fun isArray(): Boolean {
         if (this == NONE) {
             return false
@@ -312,6 +349,15 @@ open class ResolvableType {
         return resolveType().isArray()
     }
 
+    /**
+     * 从当前类的所有的接口/父类的继承关系当中, 去找到和给定的type匹配的[ResolvableType],
+     * 如果给定的type不是当前类的接口/父类的话, 那么返回[NONE]
+     *
+     * @param type 待匹配的类型
+     * @return 匹配上type的ResolvableType(没匹配上, 那么return NONE)
+     * @see getSuperType
+     * @see getInterfaces
+     */
     open fun `as`(type: Class<*>): ResolvableType {
         if (this == NONE) {
             return NONE
@@ -323,15 +369,21 @@ open class ResolvableType {
         // 遍历当前类的所有直接接口
         for (interfaceType in getInterfaces()) {
 
-            // 使用该接口, 递归去执行as方法
+            // 使用该接口, 递归去执行as方法, 去匹配type
             val interfaceAsType = interfaceType.`as`(type)
             if (interfaceAsType != NONE) {
                 return interfaceAsType
             }
         }
+        // 接口上没有找到合适的, 那么尝试从父类上去进行递归匹配...
         return getSuperType().`as`(type)
     }
 
+    /**
+     * 获取当前类的直接接口列表[ResolvableType]
+     *
+     * @return 当前类的直接接口列表ResolvableType
+     */
     open fun getInterfaces(): Array<ResolvableType> {
         val resolved = resolve() ?: return EMPTY_TYPES_ARRAY
         var interfaces = this.interfaces
@@ -346,6 +398,11 @@ open class ResolvableType {
         return interfaces!!
     }
 
+    /**
+     * 获取父类类型[ResolvableType]
+     *
+     * @return 父类superType(不存在的话, 返回NONE)
+     */
     open fun getSuperType(): ResolvableType {
         val resolved = resolve() ?: return NONE
         val superclass = resolved.genericSuperclass ?: return NONE
@@ -361,7 +418,7 @@ open class ResolvableType {
     }
 
     /**
-     * 返回解析得到的Class, 如果没有已经完成解析的Class, 那么return null
+     * 返回根据[Type]去解析得到的[Class], 如果没有已经完成解析的[Class], 那么return null
      *
      * @return 已经完成解析的Class(如果不存在的话, return null)
      */
@@ -370,9 +427,11 @@ open class ResolvableType {
     }
 
     /**
-     * 指定对于type的解析
+     * 指定对于type的解析, 将[Type]解析成为[ResolvableType]
      *
      * @return 对type执行解析得到的ResolvableType
+     * @see type
+     * @see Type
      */
     private fun resolveType(): ResolvableType {
         // 如果是ParameterizedType, 例如List<String>, Map<String, String>
@@ -393,6 +452,7 @@ open class ResolvableType {
         // 例如对于ArrayList<String>的接口列表可以获取到List<E>, List<E>的接口列表可以获取到Collection<E>
         // 当使用asCollection方法获取到Collection<E>时, 就得尝试从子类找到List<E>
         // List<E>再往子类去找到ArrayList<String>, 通过泛型名字E, 从而最终找到元素类型String
+        // 特殊情况, 对于Map/List/Set这种不指定泛型的情况, K/V/E的类型就是TypeVariable
         if (this.type is TypeVariable<*>) {
             val typeVariable = this.type as TypeVariable<*>
             val resolved = this.variableResolver?.resolveVariable(typeVariable)
@@ -413,9 +473,10 @@ open class ResolvableType {
 
 
     /**
-     * 执行对于泛型变量的解析
+     * 执行对于泛型变量的解析, 把[TypeVariable]解析成为[ResolvableType]
      *
-     * @param typeVariable 带解析的泛型变量, 比如E/T/K,V
+     * @param typeVariable 带解析的泛型变量, 比如E/T/K/V
+     * @return 根据TypeVariable去解析得到的类型ResolvableType
      */
     private fun resolveVariable(typeVariable: TypeVariable<*>): ResolvableType? {
 
@@ -444,7 +505,7 @@ open class ResolvableType {
     }
 
     /**
-     * 将当前ResolvableType转换为泛型变量的解析器
+     * 将当前[ResolvableType]转换为泛型变量(K/V/E)的解析器
      *
      * @return 泛型变量解析器
      */
@@ -455,18 +516,42 @@ open class ResolvableType {
         return DefaultVariableResolver(this)
     }
 
-    open fun isInstance(obj: Any?): Boolean {
+    /**
+     * 检查给定的实例, 是否是当前类型
+     *
+     * @param obj 待检查的实例对象
+     * @return 该实例是否是当前的类型?
+     */
+    open fun isInstance(@Nullable obj: Any?): Boolean {
         return obj != null && isAssignableFrom(obj::class.java)
     }
 
-    open fun isAssignableFrom(other: Class<*>?): Boolean {
+    /**
+     * 检查给定的目标类型, 是否是当前type的子类
+     *
+     * @param other 待匹配的类
+     * @return 如果other是当前Type的子类, 那么return true; 否则return false
+     */
+    open fun isAssignableFrom(@Nullable other: Class<*>?): Boolean {
         return isAssignableFrom(forClass(other), null)
     }
 
-    open fun isAssignableFrom(owner: ResolvableType): Boolean {
-        return isAssignableFrom(owner, null)
+    /**
+     * 检查给定的目标类型, 是否是当前type的子类
+     *
+     * @param other 待匹配的类
+     * @return 如果other是当前Type的子类, 那么return true; 否则return false
+     */
+    open fun isAssignableFrom(other: ResolvableType): Boolean {
+        return isAssignableFrom(other, null)
     }
 
+    /**
+     * 检查给定的目标类型, 是否是当前type的子类
+     *
+     * @param other 待匹配的类
+     * @return 如果other是当前Type的子类, 那么return true; 否则return false
+     */
     private fun isAssignableFrom(other: ResolvableType, matchedBefore: Map<Type, Type>?): Boolean {
         if (this == NONE || other == NONE) {
             return false
