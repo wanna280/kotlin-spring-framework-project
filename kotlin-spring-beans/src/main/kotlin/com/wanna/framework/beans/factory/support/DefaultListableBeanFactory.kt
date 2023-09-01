@@ -488,6 +488,8 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             }
 
             // 2. 解析要进行注入的元素是多个Bean的情况, 例如Collection/List/Map/Array等情况
+            // 比如注入Map<String, User>, 或者是List<User>这种情况, 我们从BeanFactory当中去解析所有的User对象并进行注入,
+            // 使用MultiElementDescriptor去包装一层, 通过泛型的嵌套去实现, 只去解析User类型的SpringBean
             val multipleBeans = resolveMultipleBeans(descriptor, requestingBeanName, autowiredBeanNames, typeConverter)
             if (multipleBeans != null) {
                 return multipleBeans
@@ -805,6 +807,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             // 获取数组的元素类型, 可以通过componentType去进行获取
             val componentType = type.componentType
             // 获取所有的候选的Bean, 包括resolvableDependencies当中的依赖和beanFactory当中的对应的类型的Bean
+            // MultiElementDescriptor会取ComponentType
             val candidates =
                 findAutowireCandidates(requestingBeanName, componentType, MultiElementDescriptor(descriptor))
             // 交给TypeConverter, 去利用Java的反射(java.lang.reflect.Array)去创建数组, 交给JVM去创建一个合成的数组类型
@@ -827,16 +830,21 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             if (keyGeneric != String::class.java) {
                 return null
             }
-            // 获取所有的候选Bean
+            // 针对ValueType, 去获取ValueType对应的所有的候选Bean(MultiElementDescriptor会取ValueType)
             val candidates =
                 findAutowireCandidates(requestingBeanName, valueGeneric as Class<*>, MultiElementDescriptor(descriptor))
+
+            // 如果找不到ValueType对应的Bean的话, return null; 走后续的fallback逻辑
+            if (candidates.isEmpty()) {
+                return null
+            }
             autowiredBeanName?.addAll(candidates.keys)
             return LinkedHashMap(candidates)
 
         } else if (ClassUtils.isAssignFrom(Collection::class.java, type) && type.isInterface) {
             val generics = descriptor.getResolvableType().asCollection().getGenerics()
             val valueType = generics[0].resolve()
-            // 找到所有的候选类型的Bean
+            // 找到集合的元素类型ElementType对应所有的候选类型的Bean(MultiElementDescriptor会取集合的元素类型)
             val candidates = findAutowireCandidates(requestingBeanName, valueType!!, MultiElementDescriptor(descriptor))
             var result = (typeConverter ?: getTypeConverter()).convertIfNecessary(candidates.values, type)
 

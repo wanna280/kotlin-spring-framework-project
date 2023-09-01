@@ -12,6 +12,10 @@ dependencies {
     compileOnly(fileTree("${project.buildDir}/libs") {
         this.include("*.jar")
     })
+
+    // junit5 单元测试
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
 }
 
 
