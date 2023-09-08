@@ -19,24 +19,12 @@ open class StringToEnumConverter : GenericConverter {
      */
     override fun getConvertibleTypes() = setOf(GenericConverter.ConvertiblePair(String::class.java, Enum::class.java))
 
-    /**
-     * 将字符串转换为枚举值
-     *
-     * @param source source
-     * @param sourceType sourceType
-     * @param targetType targetType
-     * @return 转换之后得到的枚举值
-     */
     @Suppress("UNCHECKED_CAST")
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
+    override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
         source ?: return null
-        if (source is String && targetType.isEnum) {
-            return java.lang.Enum.valueOf(targetType as Class<out Enum<*>>, source) as T?
+        if (source is String && targetType.type.isEnum) {
+            return java.lang.Enum.valueOf(targetType.type as Class<out Enum<*>>, source)
         }
         return null
-    }
-
-    override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
-        return convert(source, sourceType.type, targetType.type)
     }
 }

@@ -24,14 +24,6 @@ open class MapToMapConverter(private val conversionService: ConversionService) :
         setOf(GenericConverter.ConvertiblePair(Map::class.java, Map::class.java))
 
     /**
-     * 对于这种没有泛型的Map情况, 我们没法处理, 暂时先返回原来的了
-     */
-    @Suppress("UNCHECKED_CAST")
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
-        return source as T?
-    }
-
-    /**
      * 这种情况下, 我们可以拿到泛型, 我们可以对元素类型去进行转换
      *
      * @param source source

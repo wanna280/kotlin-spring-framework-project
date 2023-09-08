@@ -48,4 +48,15 @@ interface ConversionService {
      */
     @Nullable
     fun convert(@Nullable source: Any?, targetType: TypeDescriptor): Any?
+
+    /**
+     * 将source, 转换为目标类型(targetType), 支持去解析targetType的泛型信息
+     *
+     * @param source 源对象(可以为空)
+     * @param sourceType sourceType
+     * @param targetType 要转换的目标类型(TypeDescriptor, 支持泛型的解析)
+     * @return 转换之后的结果
+     */
+    @Nullable
+    fun convert(@Nullable source: Any?, @Nullable sourceType: TypeDescriptor?, targetType: TypeDescriptor): Any?
 }

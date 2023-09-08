@@ -23,19 +23,6 @@ class ArrayToCollectionConverter(private val conversionService: ConversionServic
     override fun getConvertibleTypes(): Set<GenericConverter.ConvertiblePair> =
         setOf(GenericConverter.ConvertiblePair(Array::class.java, Collection::class.java))
 
-    @Suppress("UNCHECKED_CAST")
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
-        // 只支持去处理source is Array, target is Collection的情况
-        if (source is Array<*> && ClassUtils.isAssignFrom(Collection::class.java, targetType)) {
-            val collection = CollectionFactory.createCollection<Any?>(targetType, source.size)
-
-            // 我们这里没有办法去处理具体的元素的泛型类型, 暂时pass掉, 直接添加
-            source.forEach(collection::add)
-            return collection as T?
-        }
-        return null
-    }
-
     override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
         // 只支持去处理source is Array, target is Collection的情况
         if (source is Array<*> && ClassUtils.isAssignFrom(Collection::class.java, targetType.type)) {

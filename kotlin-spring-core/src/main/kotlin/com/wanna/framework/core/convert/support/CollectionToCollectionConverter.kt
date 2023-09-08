@@ -19,16 +19,6 @@ class CollectionToCollectionConverter(private val conversionService: ConversionS
         return setOf(GenericConverter.ConvertiblePair(Collection::class.java, Collection::class.java))
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
-        if (source == null || source !is Collection<*>) {
-            return null
-        }
-        val result = CollectionFactory.createCollection<Any?>(targetType, source.size)
-        source.forEach(result::add)
-        return result as T?
-    }
-
     override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
         if (source == null || source !is Collection<*>) {
             return null
