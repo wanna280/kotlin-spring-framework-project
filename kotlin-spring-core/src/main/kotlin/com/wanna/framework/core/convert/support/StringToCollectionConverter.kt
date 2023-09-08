@@ -3,6 +3,7 @@ package com.wanna.framework.core.convert.support
 import com.wanna.framework.core.CollectionFactory
 import com.wanna.framework.core.convert.ConversionService
 import com.wanna.framework.core.convert.TypeDescriptor
+import com.wanna.framework.core.convert.converter.ConditionalGenericConverter
 import com.wanna.framework.core.convert.converter.GenericConverter
 import com.wanna.framework.core.convert.converter.GenericConverter.ConvertiblePair
 import com.wanna.framework.util.StringUtils
@@ -12,8 +13,19 @@ import com.wanna.framework.util.StringUtils
  *
  * @param conversionService 用于Collection内部类型的元素的转换的ConversionService
  */
-open class StringToCollectionConverter(private val conversionService: ConversionService) : GenericConverter {
+open class StringToCollectionConverter(private val conversionService: ConversionService) : ConditionalGenericConverter {
     override fun getConvertibleTypes() = setOf(ConvertiblePair(String::class.java, Collection::class.java))
+
+    /**
+     * 匹配元素类型
+     *
+     * @param sourceType sourceType(String)
+     * @param targetType targetType(Collection<E>), 可以根据泛型取到元素类型
+     * @return 能否将String转换为目标类型E
+     */
+    override fun matches(sourceType: TypeDescriptor, targetType: TypeDescriptor): Boolean {
+        return ConversionUtils.canConvertElements(sourceType, targetType.getElementTypeDescriptor(), conversionService)
+    }
 
     override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
         source ?: return null
