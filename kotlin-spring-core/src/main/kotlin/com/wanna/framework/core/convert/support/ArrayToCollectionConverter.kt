@@ -50,9 +50,7 @@ class ArrayToCollectionConverter(private val conversionService: ConversionServic
             val targetElementType = targetType.resolvableType.asCollection().getGenerics()[0].resolve(Any::class.java)
 
             // 对元素去进行类型转换, 添加到collection当中去
-            if (conversionService.canConvert(sourceElementType, targetElementType)) {
-                source.forEach { collection.add(conversionService.convert(it, targetElementType)) }
-            }
+            source.forEach { collection.add(conversionService.convert(it, targetElementType)) }
             return collection
         }
         return null
