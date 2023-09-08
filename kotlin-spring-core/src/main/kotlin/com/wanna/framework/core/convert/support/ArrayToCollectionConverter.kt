@@ -40,14 +40,12 @@ class ArrayToCollectionConverter(private val conversionService: ConversionServic
     }
 
     override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
-        // 只支持去处理source is Array, target is Collection的情况
         if (source is Array<*> && ClassUtils.isAssignFrom(Collection::class.java, targetType.type)) {
-            val collection = CollectionFactory.createCollection<Any?>(targetType.type, source.size)
+            // targetElementType为Collection的elementType
+            val targetElementType =
+                targetType.getElementTypeDescriptor() ?: throw IllegalStateException("No target element type")
 
-            // sourceType为Array的ComponentType
-            val sourceElementType = sourceType.type.componentType
-            // targetType为Collection的elementType
-            val targetElementType = targetType.resolvableType.asCollection().getGenerics()[0].resolve(Any::class.java)
+            val collection = CollectionFactory.createCollection<Any?>(targetType.type, source.size)
 
             // 对元素去进行类型转换, 添加到collection当中去
             source.forEach { collection.add(conversionService.convert(it, targetElementType)) }
