@@ -52,12 +52,20 @@ open class ResolvableType {
     /**
      * 接口列表
      */
+    @Nullable
     private var interfaces: Array<ResolvableType>? = null
 
     /**
      * 父类
      */
+    @Nullable
     private var superType: ResolvableType? = null
+
+    /**
+     * 是否存在有无法被解析的泛型参数?
+     */
+    @Nullable
+    private var unresolvableGenerics: Boolean? = null
 
     private constructor(clazz: Class<*>?) {
         this.resolved = clazz ?: Any::class.java
@@ -650,6 +658,93 @@ open class ResolvableType {
             }
         }
         return true
+    }
+
+    /**
+     * 当前Type内部, 是否存在有无法解析的泛型?
+     *
+     * @return 存在有无法被解析的泛型return true; 否则return false
+     */
+    open fun hasUnresolvableGenerics(): Boolean {
+        if (this == NONE) {
+            return false
+        }
+
+        // 优先取缓存, 避免重复计算
+        var unresolvableGenerics = this.unresolvableGenerics
+        if (unresolvableGenerics == null) {
+            unresolvableGenerics = determineUnresolvableGenerics()
+            this.unresolvableGenerics = unresolvableGenerics
+        }
+        return unresolvableGenerics
+    }
+
+    /**
+     * 执行检查当前Type内部, 是否存在有无法解析的泛型?
+     *
+     * @return 存在有无法被解析的泛型return true; 否则return false
+     */
+    private fun determineUnresolvableGenerics(): Boolean {
+        for (generic in getGenerics()) {
+            if (generic.isUnresolvableTypeVariable() || generic.isWildcardWithoutBounds()) {
+                return true
+            }
+        }
+
+        // check 泛型接口&父类, 是否有不能被解析的泛型参数?
+        val resolved = resolve()
+        if (resolved != null) {
+            try {
+                for (genericInterface in resolved.genericInterfaces) {
+                    if (genericInterface is Class<*> && genericInterface.typeParameters.isNotEmpty()) {
+                        return true
+                    }
+                }
+            } catch (ex: Throwable) {
+                // Ignore non-present types in generic signature
+            }
+            val superclass = resolved.superclass
+            if (superclass != null && superclass != Any::class.java) {
+                return getSuperType().hasUnresolvableGenerics()
+            }
+        }
+        return false
+    }
+
+    /**
+     * 检查是否存在有没有bounds存在的通配符WildcardType
+     *
+     * @return 如果存在有无bounds的WildcardType, return true; 否则return false
+     */
+    private fun isWildcardWithoutBounds(): Boolean {
+        if (this.type is WildcardType) {
+            if ((this.type as WildcardType).lowerBounds.isEmpty()) {
+                val upperBounds = (this.type as WildcardType).upperBounds
+                // 如果upperBounds, 或者upperBounds=[Object.class], 那么都认为是没有被解析
+                if (upperBounds.isEmpty() || upperBounds.size == 1 && upperBounds[0] == Any::class.java) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * 是否存在有未被解析的TypeVariable
+     *
+     * @return 如果存在有未被解析的TypeVariable, return true; 否则return false
+     */
+    private fun isUnresolvableTypeVariable(): Boolean {
+        if (this.type is TypeVariable<*>) {
+            if (this.variableResolver == null) {
+                return true
+            }
+            val resolvableType = this.variableResolver?.resolveVariable(this.type as TypeVariable<*>)
+            if (resolvableType == null || resolvableType.isUnresolvableTypeVariable()) {
+                return true
+            }
+        }
+        return false
     }
 
     override fun toString(): String {
