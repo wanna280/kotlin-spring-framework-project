@@ -681,23 +681,26 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             val fallbackDescriptor = descriptor.forFallbackMatch()
 
             // 根据给定的fallbackDescriptor, 再去进行一次匹配
-            candidateNames.forEach {
+            for (candidateName in candidateNames) {
                 // 从DependencyDescriptor当中解析到合适的依赖, 判断该Bean, 是否是一个Autowire候选Bean?
-                if (!isSelfReference(beanName, it) && isAutowireCandidate(it, fallbackDescriptor)) {
-                    addCandidateEntry(result, it, descriptor, requiredType)
+                if (!isSelfReference(beanName, candidateName)
+                    && isAutowireCandidate(candidateName, fallbackDescriptor)
+                    && (!multiple || getAutowireCandidateResolver().hasQualifier(descriptor))
+                ) {
+                    addCandidateEntry(result, candidateName, descriptor, requiredType)
                 }
             }
 
             // 如果不是一个MultipleBean的话, 那么我们再去检查一下是否是自身引用的情况?
             // 对于自身引用的情况, 我们是完全允许的...对于非Array/Collection/Map的情况, 那么我们在这里去允许去注入自身
             // 这里我们首先得排除掉MultiElementDescriptor的情况, 因为它也可以决定是否正在注入的元素是一个MultipleBean
-            if (!multiple) {
-                candidateNames.forEach {
-                    if (isSelfReference(beanName, it)  // allow self reference
+            if (result.isEmpty() && !multiple) {
+                for (candidateName in candidateNames) {
+                    if (isSelfReference(beanName, candidateName)  // allow self reference
                         && (descriptor !is MultiElementDescriptor)  // should not be MultiElementDescriptor
-                        && isAutowireCandidate(it, fallbackDescriptor)  // autowire candidate
+                        && isAutowireCandidate(candidateName, fallbackDescriptor)  // autowire candidate
                     ) {
-                        addCandidateEntry(result, it, descriptor, requiredType)
+                        addCandidateEntry(result, candidateName, descriptor, requiredType)
                     }
                 }
             }
