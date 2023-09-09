@@ -80,7 +80,7 @@ open class GenericTypeAwareAutowireCandidateResolver : BeanFactoryAware, SimpleA
             // 那么我们尽最大可能去进行寻找, 直接根据BeanDefinition的beanClass去进行解析
             if (targetType == null && rbd != null && rbd.hasBeanClass() && rbd.getFactoryMethodName() == null) {
                 val beanClass = rbd.getBeanClass()
-                if (ClassUtils.isAssignable(FactoryBean::class.java, beanClass)) {
+                if (!ClassUtils.isAssignable(FactoryBean::class.java, beanClass)) {
                     targetType = ResolvableType.forClass(beanClass)
                 }
             }
