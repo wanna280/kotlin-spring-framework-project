@@ -91,6 +91,7 @@ open class GenericTypeAwareAutowireCandidateResolver : BeanFactoryAware, SimpleA
         if (cacheType) {
             rbd?.targetType = targetType
         }
+        // 如果允许fallback匹配, 那么如果有不写泛型的元素, 正常情况下Map<String, String>, 但是对于不写泛型的Map这种情况, 直接认为算是匹配
         if (descriptor.fallbackMatchAllowed() && targetType.resolve() == Properties::class.java) {
             return true
         }

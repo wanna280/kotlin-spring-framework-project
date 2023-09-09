@@ -673,14 +673,17 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
         }
 
 
-        // 如果还没搜索结果的话...尝试换个手段, 去进行匹配
+        // 如果还没搜索结果的话...尝试换个手段(并且允许fallback, 不匹配泛型), 去进行匹配
         if (result.isEmpty()) {
             val multiple = indicatesMultipleBeans(requiredType)
 
             // 获取到Fallback的DependencyDescriptor
             val fallbackDescriptor = descriptor.forFallbackMatch()
 
-            // 根据给定的fallbackDescriptor, 再去进行一次匹配
+            // 根据给定的fallbackDescriptor, 再去进行一次fallback匹配, 这里会允许匹配没有泛型的情况...
+            // Note: 如果是要注入一个Map<String, XXX>元素, 在允许fallback的情况下, Properties/没有泛型的Map其中都能被匹配进来,
+            // 但是这种情况这些Map的Bean, 其实都不应该被匹配进来, 因此通过非multiple的方式去排除掉这些不知道啥情况的未知Map,
+            // 除非你使用@Qualifier去指定了要去进行注入的目标元素才允许被注入进来该未知类型的Map元素...
             for (candidateName in candidateNames) {
                 // 从DependencyDescriptor当中解析到合适的依赖, 判断该Bean, 是否是一个Autowire候选Bean?
                 if (!isSelfReference(beanName, candidateName)
