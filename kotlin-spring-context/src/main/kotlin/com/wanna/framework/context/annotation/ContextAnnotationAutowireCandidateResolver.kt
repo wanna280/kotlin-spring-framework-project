@@ -6,6 +6,7 @@ import com.wanna.framework.beans.factory.exception.NoSuchBeanDefinitionException
 import com.wanna.framework.beans.factory.support.AutowireCandidateResolver
 import com.wanna.framework.beans.factory.support.DefaultListableBeanFactory
 import com.wanna.framework.beans.factory.support.DependencyDescriptor
+import com.wanna.framework.core.ResolvableType
 import com.wanna.framework.lang.Nullable
 
 /**
@@ -31,7 +32,10 @@ open class ContextAnnotationAutowireCandidateResolver : QualifierAnnotationAutow
      * @return 构建好的代理对象(如果不是Lazy的, 那么return null)
      */
     @Nullable
-    override fun getLazyResolutionProxyIfNecessary(descriptor: DependencyDescriptor, @Nullable beanName: String?): Any? {
+    override fun getLazyResolutionProxyIfNecessary(
+        descriptor: DependencyDescriptor,
+        @Nullable beanName: String?
+    ): Any? {
         return if (isLazy(descriptor)) buildLazyResolutionProxy(descriptor, beanName) else null
     }
 
@@ -85,7 +89,7 @@ open class ContextAnnotationAutowireCandidateResolver : QualifierAnnotationAutow
                     } else if (type == Set::class.java || type == Collection::class.java) {
                         return emptySet<Any?>()
                     }
-                    throw NoSuchBeanDefinitionException("没有在BeanFactory当中找到合适的Bean", null, beanName, type)
+                    throw NoSuchBeanDefinitionException(ResolvableType.forClass(type))
                 }
                 return target
             }

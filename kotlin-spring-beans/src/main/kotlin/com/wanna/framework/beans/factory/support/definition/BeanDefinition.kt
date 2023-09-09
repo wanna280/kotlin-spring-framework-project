@@ -5,6 +5,7 @@ import com.wanna.framework.beans.factory.config.ConstructorArgumentValues
 import com.wanna.framework.beans.factory.support.definition.config.AttributeAccessor
 import com.wanna.framework.beans.factory.support.definition.config.BeanMetadataElement
 import com.wanna.framework.beans.method.MethodOverrides
+import com.wanna.framework.core.ResolvableType
 import com.wanna.framework.lang.Nullable
 import java.util.function.Supplier
 
@@ -193,7 +194,7 @@ interface BeanDefinition : AttributeAccessor, BeanMetadataElement {
     fun getRole(): Int
 
     /**
-     * 当前BeanDefinition是否是抽象的? 
+     * 当前BeanDefinition是否是抽象的?
      *
      * @param abstractFlag 如果抽象, 设置为true; 否则为false
      */
@@ -229,7 +230,7 @@ interface BeanDefinition : AttributeAccessor, BeanMetadataElement {
     fun getMethodOverrides(): MethodOverrides
 
     /**
-     * 当前BeanDefinition当中是否有需要进行运行时方法重写的? 
+     * 当前BeanDefinition当中是否有需要进行运行时方法重写的?
      *
      * @return 如果当前BeanDefinition存在有要进行运行时方法重写的话, return true; 否则return false
      */
@@ -243,7 +244,7 @@ interface BeanDefinition : AttributeAccessor, BeanMetadataElement {
     fun getPropertyValues(): MutablePropertyValues
 
     /**
-     * 是否有PropertyValue? 
+     * 是否有PropertyValue?
      *
      * @return 如果存在有PropertyValue的话, return true; 否则return false
      */
@@ -298,5 +299,12 @@ interface BeanDefinition : AttributeAccessor, BeanMetadataElement {
      * @return 需要依赖的BeanDefinition的beanName列表
      */
     fun getDependsOn(): Array<String>
+
+    /**
+     * 获取到Bean的类型, 基于beanClass或者是别的一些元信息可以去进行构建
+     *
+     * @return Bean类型ResolvableType(可能是[ResolvableType.NONE])
+     */
+    fun getResolvableType(): ResolvableType
 
 }

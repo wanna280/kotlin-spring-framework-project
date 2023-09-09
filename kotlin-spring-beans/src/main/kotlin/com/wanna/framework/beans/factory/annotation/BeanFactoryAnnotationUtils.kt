@@ -72,7 +72,10 @@ object BeanFactoryAnnotationUtils {
         } else if (beanFactory.containsBean(qualifier)) {
             return beanFactory.getBean(qualifier, beanType)
         } else {
-            throw NoSuchBeanDefinitionException("没有从BeanFactory当中根据beanName(qualifier)=[$qualifier]去获取到Bean, 并且BeanFactory还不是ListableBeanFactory, 因此无法根据qualifier去对所有的Bean去进行逐一的qualifier匹配")
+            throw NoSuchBeanDefinitionException(
+                qualifier,
+                "没有从BeanFactory当中根据beanName(qualifier)=[$qualifier]去获取到Bean, 并且BeanFactory还不是ListableBeanFactory, 因此无法根据qualifier去对所有的Bean去进行逐一的qualifier匹配"
+            )
         }
     }
 
@@ -104,7 +107,10 @@ object BeanFactoryAnnotationUtils {
         } else if (lbf.containsBean(qualifier)) {
             return lbf.getBean(qualifier, beanType)
         } else {
-            throw NoSuchBeanDefinitionException("没有在BeanFactory当中根据qualifier=[$qualifier]去找到合适的Bean, 根据qualifier/beanName去进行寻找都没有找到合适的")
+            throw NoSuchBeanDefinitionException(
+                qualifier,
+                "没有在BeanFactory当中根据qualifier=[$qualifier]去找到合适的Bean, 根据qualifier/beanName去进行寻找都没有找到合适的"
+            )
         }
     }
 

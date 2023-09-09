@@ -1,7 +1,7 @@
 package com.wanna.framework.beans.factory.support
 
-import com.wanna.common.logging.LoggerFactory
 import com.wanna.framework.beans.BeanFactoryAware
+import com.wanna.framework.beans.BeansException
 import com.wanna.framework.beans.SmartInitializingSingleton
 import com.wanna.framework.beans.TypeConverter
 import com.wanna.framework.beans.factory.*
@@ -13,7 +13,6 @@ import com.wanna.framework.beans.factory.exception.NoSuchBeanDefinitionException
 import com.wanna.framework.beans.factory.exception.NoUniqueBeanDefinitionException
 import com.wanna.framework.beans.factory.support.definition.BeanDefinition
 import com.wanna.framework.beans.factory.support.definition.RootBeanDefinition
-import com.wanna.framework.core.ParameterNameDiscoverer
 import com.wanna.framework.core.ResolvableType
 import com.wanna.framework.core.comparator.AnnotationAwareOrderComparator
 import com.wanna.framework.core.comparator.OrderComparator
@@ -298,7 +297,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
          * 嵌套解析泛型的依赖描述符, ObjectProvider/ObjectFactory指定了泛型,
          * 这里的descriptor描述的就是泛型的类型信息
          */
-        private val descriptor = NestedDependencyDescriptor(originDescriptor);
+        private val descriptor = NestedDependencyDescriptor(originDescriptor)
 
         /**
          * ObjectFactory获取对象的工厂方法
@@ -307,7 +306,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
          */
         override fun getObject(): Any {
             return doResolveDependency(descriptor, beanName, null, null)
-                ?: throw NoSuchBeanDefinitionException(this.descriptor.getResolvableType().toString())
+                ?: throw NoSuchBeanDefinitionException(this.descriptor.getResolvableType())
         }
 
         /**
@@ -422,6 +421,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
         // 设置InjectionPoint
         val previousInjectionPoint = ConstructorResolver.setCurrentInjectionPoint(descriptor)
         try {
+            val dependencyResolvableType = descriptor.getResolvableType()
             val type = descriptor.getDependencyType()
 
             // 1. 从AutowireCandidateResolver去获取到建议进行设置的值, 主要用来处理@Value注解
@@ -436,7 +436,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
                 try {
                     return (typeConverter ?: getTypeConverter()).convertIfNecessary(value, type)
                 } catch (ex: Exception) {
-                    logger.error("类型转换失败, 无法将String转换为目标类型[type=$type]", ex)
+                    logger.error("类型转换失败, 无法将String转换为目标类型[type=$dependencyResolvableType]", ex)
                 }
                 return value
             }
@@ -455,9 +455,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             // 3.1 如果根本没有找到候选的Bean, 那么需要处理required=true/false并return
             if (matchingBeans.isEmpty()) {
                 if (isRequired(descriptor)) {
-                    throw NoSuchBeanDefinitionException(
-                        "至少需要一个该类型的Bean, beanType=[$type], 但是在BeanFactory当中不存在", null, null, type
-                    )
+                    raiseNoMatchingBeanFound(type, dependencyResolvableType, descriptor)
                 }
                 return null
             }
@@ -482,9 +480,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             var result = instanceCandidate
             if (result == null) {
                 if (descriptor.isRequired()) {
-                    throw NoSuchBeanDefinitionException(
-                        "至少需要一个该类型的Bean, beanType=[$type], 但是在BeanFactory当中不存在", null, null, type
-                    )
+                    raiseNoMatchingBeanFound(type, dependencyResolvableType, descriptor)
                 }
                 result = null
             }
@@ -540,12 +536,12 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
     @Nullable
     private fun determinePrimaryCandidate(candidates: Map<String, Any>, requiredType: Class<*>): String? {
         var primaryCandidate: String? = null
-        candidates.forEach { (beanName, bean) ->
+        for ((beanName, bean) in candidates.entries) {
             if (isPrimary(beanName, bean)) {
                 if (primaryCandidate == null) {
                     primaryCandidate = beanName
                 } else {
-                    if (containsBeanDefinition(beanName) && containsBeanDefinition(primaryCandidate!!)) {
+                    if (containsBeanDefinition(beanName) && containsBeanDefinition(primaryCandidate)) {
                         throw NoUniqueBeanDefinitionException("[requiredType=$requiredType]没有找到唯一的PrimaryBean去进行注入, 有[$primaryCandidate,$beanName]等都是PrimaryBean")
                     }
                 }
@@ -566,7 +562,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
     private fun determineHighestOrderCandidate(candidates: Map<String, Any>, requiredType: Class<*>): String? {
         var highOrderCandidate: String? = null
         var highOrder: Int? = null
-        candidates.forEach { (beanName, bean) ->
+        for ((beanName, bean) in candidates) {
             val priority = getPriority(bean)
             if (priority != null) {
                 if (highOrder == null) {
@@ -576,7 +572,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
                     // 如果遇到了highOrder==priority的情况, 那么抛出Bean不唯一异常
                     if (highOrder == priority) {
                         throw NoUniqueBeanDefinitionException("给定的beanType[${ClassUtils.getQualifiedName(requiredType)}]对应的Bean在SpringBeanFactory当中不唯一")
-                    } else if (highOrder!! > priority) {
+                    } else if (highOrder > priority) {
                         highOrder = priority
                         highOrderCandidate = beanName
                     }
@@ -622,7 +618,18 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
      * @param beanInstance beanInstance
      * @return 该Bean是否是Primary的? 如果是return true, 不然return false
      */
-    private fun isPrimary(beanName: String, beanInstance: Any) = getMergedBeanDefinition(beanName).isPrimary()
+    protected fun isPrimary(beanName: String, beanInstance: Any): Boolean {
+        val transformBeanName = transformBeanName(beanName)
+
+        // 如果当前BeanFactory当中包含当前beanName的BeanDefinition, 那么获取BeanDefinition去进行匹配
+        if (containsBeanDefinition(transformBeanName)) {
+            return getMergedLocalBeanDefinition(transformBeanName).isPrimary()
+        }
+        // 如果当前BeanFactory当中没有这样的BeanDefinition, 那么尝试交给parentBeanFactory去进行判断
+        val parentBeanFactory = getParentBeanFactory()
+        return parentBeanFactory is DefaultListableBeanFactory
+                && parentBeanFactory.isPrimary(transformBeanName, beanInstance)
+    }
 
     /**
      * 根据DependencyDescriptor去BeanFactory当中寻找到所有的候选的要进行注入的Bean的列表;
@@ -776,14 +783,16 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
 
         } else if (type == Map::class.java) {
             val generics = descriptor.getResolvableType().asMap().getGenerics()
-            // 如果是Map类型, 那么这里完全可以去断言：泛型类型的长度一定为2
+            // 如果是Map类型, 那么这里完全可以去断言: 泛型类型的长度一定为2
             val keyGeneric = generics[0].resolve()
-            val valueGeneric = generics[1].resolve()
 
             // 如果key的泛型不是String类型, 那么return null
             if (keyGeneric != String::class.java) {
                 return null
             }
+            // value泛型为null, 那么pass...
+            val valueGeneric = generics[1].resolve() ?: return null
+
             // 针对ValueType, 去获取ValueType对应的所有的候选Bean(MultiElementDescriptor会取ValueType)
             val candidates =
                 findAutowireCandidates(requestingBeanName, valueGeneric as Class<*>, MultiElementDescriptor(descriptor))
@@ -823,6 +832,22 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
         return type.isArray || (type.isInterface && (ClassUtils.isAssignFrom(
             Collection::class.java, type
         ) || ClassUtils.isAssignFrom(Map::class.java, type)))
+    }
+
+    /**
+     * 在无法解析到合适的依赖的时候, 丢出一个[NoSuchBeanDefinitionException]或者是[BeanNotOfRequiredTypeException]
+     *
+     * @param type dependencyType
+     * @param resolvableType ResolvableType
+     * @param descriptor 要去进行注入的依赖的依赖描述符
+     */
+    @Throws(BeansException::class)
+    private fun raiseNoMatchingBeanFound(
+        type: Class<*>,
+        resolvableType: ResolvableType,
+        descriptor: DependencyDescriptor
+    ) {
+        throw NoSuchBeanDefinitionException(resolvableType)
     }
 
     /**
@@ -887,7 +912,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
             }
         }
         return beanDefinition
-            ?: throw NoSuchBeanDefinitionException("BeanFactory当中没有name=[$beanName]的BeanDefinition")
+            ?: throw NoSuchBeanDefinitionException(beanName, "BeanFactory当中没有name=[$beanName]的BeanDefinition")
     }
 
     /**
@@ -899,7 +924,7 @@ open class DefaultListableBeanFactory : ConfigurableListableBeanFactory, BeanDef
      */
     override fun removeBeanDefinition(name: String) {
         beanDefinitionMap[name]
-            ?: throw NoSuchBeanDefinitionException("BeanFactory当中没有name=[$name]的BeanDefinition")
+            ?: throw NoSuchBeanDefinitionException(name, "BeanFactory当中没有name=[$name]的BeanDefinition")
         synchronized(this.beanDefinitionMap) {
             // copy一份原来的数据, 不要动原来的数据, 保证可以进行更加安全的迭代
             val beanDefinitionNames = ArrayList(beanDefinitionNames)

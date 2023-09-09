@@ -8,6 +8,7 @@ import com.wanna.framework.beans.factory.support.definition.BeanDefinition.Compa
 import com.wanna.framework.beans.factory.support.definition.BeanDefinition.Companion.SCOPE_SINGLETON
 import com.wanna.framework.beans.factory.support.definition.config.BeanMetadataAttributeAccessor
 import com.wanna.framework.beans.method.MethodOverrides
+import com.wanna.framework.core.ResolvableType
 import com.wanna.framework.core.io.Resource
 import com.wanna.framework.lang.Nullable
 import com.wanna.framework.util.ClassUtils
@@ -531,4 +532,13 @@ abstract class AbstractBeanDefinition : BeanDefinition, BeanMetadataAttributeAcc
      */
     @Nullable
     override fun getResourceDescription(): String? = resource?.getDescription()
+
+    /**
+     * 获取到Bean的类型, 基于beanClass或者是别的一些元信息可以去进行构建
+     *
+     * @return Bean类型ResolvableType(可能是[ResolvableType.NONE])
+     */
+    override fun getResolvableType(): ResolvableType {
+        return if (hasBeanClass()) ResolvableType.forClass(getBeanClass()) else ResolvableType.NONE
+    }
 }
