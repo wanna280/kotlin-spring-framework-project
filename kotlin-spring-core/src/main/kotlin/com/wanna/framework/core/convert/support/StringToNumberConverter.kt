@@ -38,38 +38,37 @@ open class StringToNumberConverter : GenericConverter {
 
     override fun getConvertibleTypes() = this.convertiblePairs
 
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
+    override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
         val sourceStr = source?.toString() ?: return null
 
-        if (targetType == Int::class.java || targetType == Int::class.javaObjectType) {
-            return sourceStr.toInt() as T?
-        }
-        if (targetType == Byte::class.java || targetType == Byte::class.javaObjectType) {
-            return sourceStr.toByte() as T?
-        }
-        if (targetType == Long::class.java || targetType == Long::class.javaObjectType) {
-            return sourceStr.toLong() as T?
-        }
-        if (targetType == Double::class.java || targetType == Double::class.javaObjectType) {
-            return sourceStr.toDouble() as T?
-        }
-        if (targetType == Short::class.java || targetType == Short::class.javaObjectType) {
-            return sourceStr.toShort() as T?
-        }
-        if (targetType == Float::class.java || targetType == Float::class.javaObjectType) {
-            return sourceStr.toFloat() as T?
-        }
-        if (targetType == Char::class.java || targetType == Char::class.javaObjectType) {
-            return sourceStr.toInt().toChar() as T?
-        }
-        if (targetType == Boolean::class.java || targetType == Boolean::class.javaObjectType) {
-            return sourceStr.toBoolean() as T?
-        }
-        throw UnsupportedOperationException("不支持将sourceType=[$sourceType]转换为targetType=[$targetType]")
-    }
+        val targetTypeClass = targetType.type
 
-    override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? =
-        convert(source, sourceType.type, targetType.type)
+        if (targetTypeClass == Int::class.java || targetTypeClass == Int::class.javaObjectType) {
+            return sourceStr.toInt()
+        }
+        if (targetTypeClass == Byte::class.java || targetTypeClass == Byte::class.javaObjectType) {
+            return sourceStr.toByte()
+        }
+        if (targetTypeClass == Long::class.java || targetTypeClass == Long::class.javaObjectType) {
+            return sourceStr.toLong()
+        }
+        if (targetTypeClass == Double::class.java || targetTypeClass == Double::class.javaObjectType) {
+            return sourceStr.toDouble()
+        }
+        if (targetTypeClass == Short::class.java || targetTypeClass == Short::class.javaObjectType) {
+            return sourceStr.toShort()
+        }
+        if (targetTypeClass == Float::class.java || targetTypeClass == Float::class.javaObjectType) {
+            return sourceStr.toFloat()
+        }
+        if (targetTypeClass == Char::class.java || targetTypeClass == Char::class.javaObjectType) {
+            return sourceStr.toInt().toChar()
+        }
+        if (targetTypeClass == Boolean::class.java || targetTypeClass == Boolean::class.javaObjectType) {
+            return sourceStr.toBoolean()
+        }
+        throw UnsupportedOperationException("不支持将sourceType=[$sourceType]转换为targetType=[$targetTypeClass]")
+    }
 
     override fun toString() = getConvertibleTypes().toString()
 }

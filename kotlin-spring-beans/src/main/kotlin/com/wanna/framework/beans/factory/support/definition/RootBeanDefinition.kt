@@ -1,6 +1,7 @@
 package com.wanna.framework.beans.factory.support.definition
 
 import com.wanna.framework.beans.factory.support.BeanDefinitionHolder
+import com.wanna.framework.core.ResolvableType
 import com.wanna.framework.core.type.MethodMetadata
 import com.wanna.framework.lang.Nullable
 import java.lang.reflect.Executable
@@ -34,6 +35,11 @@ open class RootBeanDefinition() : AbstractBeanDefinition() {
 
         }
     }
+
+    /**
+     * FactoryMethod的返回值类型
+     */
+    internal var factoryMethodReturnType: ResolvableType? = null
 
     /**
      * factoryMethod(@Bean方法标注的方法)
@@ -108,6 +114,11 @@ open class RootBeanDefinition() : AbstractBeanDefinition() {
     private var isFactoryBean: Boolean? = null
 
     /**
+     * 已经完成解析的目标类型ResolvableType
+     */
+    internal var targetType: ResolvableType? = null
+
+    /**
      * 已经解析完成的目标beanType
      */
     var resolvedTargetType: Class<*>? = null
@@ -158,6 +169,26 @@ open class RootBeanDefinition() : AbstractBeanDefinition() {
         if (resolvedTargetType != null) {
             return resolvedTargetType
         }
-        return null
+        return targetType?.resolve()
+    }
+
+    override fun getResolvableType(): ResolvableType {
+        // 优先取targetType
+        val targetType = this.targetType
+        if (targetType != null) {
+            return targetType
+        }
+        // 尝试取factoryMethod的返回值类型ResolvableType
+        val returnType = factoryMethodReturnType
+        if (returnType != null) {
+            return returnType
+        }
+        // 尝试取factoryMethod, 去构建returnType
+        val factoryMethod = this.factoryMethodToIntrospect
+        if (factoryMethod != null) {
+            return ResolvableType.forMethodReturnType(factoryMethod)
+        }
+        // 尝试使用beanClass作为ResolvableType
+        return super.getResolvableType()
     }
 }

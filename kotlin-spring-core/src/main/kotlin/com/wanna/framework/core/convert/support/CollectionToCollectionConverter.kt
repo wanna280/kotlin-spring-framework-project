@@ -3,6 +3,7 @@ package com.wanna.framework.core.convert.support
 import com.wanna.framework.core.CollectionFactory
 import com.wanna.framework.core.convert.ConversionService
 import com.wanna.framework.core.convert.TypeDescriptor
+import com.wanna.framework.core.convert.converter.ConditionalGenericConverter
 import com.wanna.framework.core.convert.converter.GenericConverter
 
 /**
@@ -10,7 +11,7 @@ import com.wanna.framework.core.convert.converter.GenericConverter
  *
  * @param conversionService ConversionService, 因为对于Collection来说, 还需要对内部的元素去进行类型转换, 因此还需要用到ConversionService
  */
-class CollectionToCollectionConverter(private val conversionService: ConversionService) : GenericConverter {
+class CollectionToCollectionConverter(private val conversionService: ConversionService) : ConditionalGenericConverter {
 
     /**
      * Collection->Collection
@@ -19,14 +20,19 @@ class CollectionToCollectionConverter(private val conversionService: ConversionS
         return setOf(GenericConverter.ConvertiblePair(Collection::class.java, Collection::class.java))
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
-        if (source == null || source !is Collection<*>) {
-            return null
-        }
-        val result = CollectionFactory.createCollection<Any?>(targetType, source.size)
-        source.forEach(result::add)
-        return result as T?
+    /**
+     * getConvertibleTypes只能匹配外层的类型, 在matches内去匹配泛型的元素类型
+     *
+     * @param sourceType 原始的集合类型, 用于取泛型, 去计算元素类型
+     * @param targetType 目标集合类型, 用于取泛型, 去计算元素类型
+     * @return 能否进行内部的元素的类型转换?
+     */
+    override fun matches(sourceType: TypeDescriptor, targetType: TypeDescriptor): Boolean {
+        return ConversionUtils.canConvertElements(
+            sourceType.getElementTypeDescriptor(),
+            targetType.getElementTypeDescriptor(),
+            conversionService
+        )
     }
 
     override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {

@@ -46,10 +46,6 @@ class NumberNumberObjectConverter : GenericConverter {
         )
     }
 
-    override fun <S : Any, T : Any> convert(source: Any?, sourceType: Class<S>, targetType: Class<T>): T? {
-        return source as T?
-    }
-
     override fun convert(source: Any?, sourceType: TypeDescriptor, targetType: TypeDescriptor): Any? {
         return source
     }

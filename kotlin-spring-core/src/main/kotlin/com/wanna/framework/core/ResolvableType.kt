@@ -1,6 +1,7 @@
 package com.wanna.framework.core
 
 import com.wanna.framework.lang.Nullable
+import com.wanna.framework.util.ClassUtils
 import java.io.Serializable
 import java.lang.reflect.*
 
@@ -15,8 +16,9 @@ import java.lang.reflect.*
 open class ResolvableType {
 
     /**
-     * 当前Class, 也就是不带泛型的Class
+     * 当前Class, 也就是不带泛型的Class, 可能为null
      */
+    @Nullable
     private var resolved: Class<*>? = null
 
     /**
@@ -27,16 +29,19 @@ open class ResolvableType {
     /**
      * 数组的元素类型, 如果无法推断出来, 那么值为null
      */
+    @Nullable
     private var componentType: ResolvableType? = null
 
     /**
      * 泛型变量的解析器
      */
+    @Nullable
     private var variableResolver: VariableResolver? = null
 
     /**
      * TypeProvider
      */
+    @Nullable
     private var typeProvider: TypeProvider? = null
 
     /**
@@ -113,6 +118,15 @@ open class ResolvableType {
         }
         // 非泛型数组
         return resolveType().resolve()
+    }
+
+    /**
+     * 获取原始的Type
+     *
+     * @return type
+     */
+    open fun getType(): Type {
+        return this.type ?: throw IllegalStateException("type is null")
     }
 
     /**
@@ -550,17 +564,92 @@ open class ResolvableType {
      * 检查给定的目标类型, 是否是当前type的子类
      *
      * @param other 待匹配的类
+     * @param matchedBefore 在之前已经进行匹配的过的Type(Key-this.type, Value-other.type)
      * @return 如果other是当前Type的子类, 那么return true; 否则return false
      */
-    private fun isAssignableFrom(other: ResolvableType, matchedBefore: Map<Type, Type>?): Boolean {
+    private fun isAssignableFrom(other: ResolvableType, matchedBefore: MutableMap<Type, Type>?): Boolean {
+        var matchedBeforeToUse = matchedBefore
+
         if (this == NONE || other == NONE) {
             return false
         }
+
+        // 如果是数组的话, 那么只需要判断元素类型是否匹配即可...
         if (isArray()) {
-            return this.getComponentType().isAssignableFrom(other.getComponentType())
+            return other.isArray() && this.getComponentType().isAssignableFrom(other.getComponentType())
         }
-        // 先这么判断吧, 后面再修一下...
-        return resolve()!!.isAssignableFrom(other.resolve()!!)
+        // 如果之前已经匹配过this.type和other.type, 这种情况直接pass掉, 不再进行继续匹配...
+        if (matchedBeforeToUse != null && matchedBeforeToUse[this.type!!] == other.type) {
+            return true
+        }
+
+        val ourBounds = WildcardBounds.get(this)
+        val typeBounds = WildcardBounds.get(other)
+
+        // 如果other是<? extends Number>或者说<? super Number>的情况
+        // 那么我们必须要求, this和other的泛型完全一致才算匹配, kind一致&bounds完全一致
+        if (typeBounds != null) {
+            return ourBounds != null && ourBounds.isSameKind(typeBounds)
+                    && ourBounds.isAssignable(*typeBounds.bounds)
+        }
+
+        // 如果this是<? extends Number>或者说<? super Number>的情况
+        // 那么我们只需要去要求, other的类型是Number就行...
+        if (ourBounds != null) {
+            return ourBounds.isAssignable(other)
+        }
+
+        val extraMatch = matchedBeforeToUse != null
+
+        var ourResolved: Class<*>? = null
+
+        // 如果是TypeVariable的话, 我们需要先解析一波
+        if (this.type is TypeVariable<*>) {
+            // 如果this存在有variableResolver, 那么尝试使用它去进行泛型变量的解析
+            if (this.variableResolver != null) {
+                ourResolved = this.variableResolver?.resolveVariable(this.type as TypeVariable<*>)?.resolve()
+            }
+        }
+
+        // 如果没解析出来当前的type的话, 那么我们使用Object.class作为fallback
+        ourResolved = ourResolved ?: resolve(Any::class.java)
+
+        // other的类型(Class), 默认为Object.class
+        val otherResolved = other.resolve(Any::class.java)
+
+        // extraMatch=true这种情况是内部的泛型类型的检查, 我们不能检查isAssignable, 只能够判断equals
+        // 比如List<CharSequence>和List<String>这种情况不能认为是存在有继承关系...
+        if (extraMatch) {
+            if (ourResolved != otherResolved) {
+                return false
+            }
+
+            // 如果extraMatch=false, 说明不是内部泛型的匹配, 我们直接判断isAssignable就行...
+        } else {
+            if (!ClassUtils.isAssignable(ourResolved, otherResolved)) {
+                return false
+            }
+        }
+
+        // 如果this和other都不是<? extends Number>或者说<? super Number>这种情况
+        // 比如类似简单的List<String>这种情况, 我们需要去递归检查泛型...
+        val ourGenerics = getGenerics()
+        val typeGenerics = other.`as`(resolve(Any::class.java)).getGenerics()
+        if (ourGenerics.size != typeGenerics.size) {
+            return false
+        }
+
+        // 对于泛型的匹配, 那么需要把type塞入到matchedBefore列表当中...(key是this.type, value是other.type)
+        matchedBeforeToUse = matchedBeforeToUse ?: LinkedHashMap(1)
+        matchedBeforeToUse[this.type!!] = other.type!!
+
+        // 对应位置的泛型, 依次去进行匹配, 其中一个匹配不上, 就return false...
+        for (i in ourGenerics.indices) {
+            if (!ourGenerics[i].isAssignableFrom(typeGenerics[i], matchedBeforeToUse)) {
+                return false
+            }
+        }
+        return true
     }
 
     override fun toString(): String {
@@ -916,6 +1005,11 @@ open class ResolvableType {
         fun resolveVariable(typeVariable: TypeVariable<*>): ResolvableType?
     }
 
+    /**
+     * 默认的[VariableResolver]实现, 基于[ResolvableType]去提供泛型的解析能力
+     *
+     * @param source 被利用来作为泛型的解析的ResolvableType
+     */
     private class DefaultVariableResolver(private val source: ResolvableType) : VariableResolver {
         override fun getSource(): Any {
             return source
@@ -936,5 +1030,103 @@ open class ResolvableType {
         }
 
         fun readResolve(): Any = INSTANCE
+    }
+
+    /**
+     * 内部使用的针对通配符的情况, 也就是泛型的协变(`<? extends T>`)/逆变(`<? super T>`), 去进行解析和处理的工具类
+     *
+     * @param kind UPPER协变/LOWER逆变
+     * @param bounds lowerBounds/upperBounds, 例如针对<? extends T>将会得到T
+     *
+     * @see WildcardType.getLowerBounds
+     * @see WildcardType.getUpperBounds
+     */
+    private class WildcardBounds(val kind: Kind, val bounds: Array<ResolvableType>) {
+
+        /**
+         * 检查当前的[WildcardBounds]和给定的[WildcardBounds]的通配符类型(UPPER/LOWER)是否一致
+         *
+         * @param bounds bounds
+         * @return 当前bound和给定的bound的kind是否一致
+         * @see Kind
+         */
+        fun isSameKind(bounds: WildcardBounds): Boolean {
+            return this.kind == bounds.kind
+        }
+
+        /**
+         * 判断给定的Type, 是否是继承自bounds当中的Type
+         *
+         * @param types 待检查的Type列表
+         * @return 继承关系是否成立?
+         */
+        fun isAssignable(vararg types: ResolvableType): Boolean {
+            for (bound in this.bounds) {
+                for (type in types) {
+                    if (!isAssignable(bound, type)) {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+
+        private fun isAssignable(source: ResolvableType, from: ResolvableType): Boolean {
+            if (this.kind == Kind.LOWER) {
+                return from.isAssignableFrom(source)
+            }
+            return source.isAssignableFrom(from)
+        }
+
+        companion object {
+
+            /**
+             * 对于[WildcardBounds]的构建的工厂方法(只有在type类型为[WildcardType]的情况, 才会返回非空; 否则return null)
+             *
+             * @param type 要去进行构建WildcardBounds的ResolvableType
+             * @return 针对该type去构建得到的WildcardBounds(如果不存在的话, 那么return null)
+             */
+            @Nullable
+            fun get(type: ResolvableType): WildcardBounds? {
+                var resolveToWildcard = type
+
+                // 如果type不是WildcardType的话, 那么执行对于
+                while (resolveToWildcard.type !is WildcardType) {
+                    if (resolveToWildcard == NONE) {
+                        return null
+                    }
+                    resolveToWildcard = resolveToWildcard.resolveType()
+                }
+                val wildcardType = resolveToWildcard.type as WildcardType
+
+                // 如果有lowerBounds, 那么为LOWER; 否则为UPPER
+                val kind = if (wildcardType.lowerBounds.isEmpty()) Kind.UPPER else Kind.LOWER
+                // 如果有lowerBounds, 那么取lowBounds; 否则取upperBounds, 一定不为null, 可能为emptyArray
+                val bounds =
+                    if (wildcardType.lowerBounds.isEmpty()) wildcardType.upperBounds else wildcardType.lowerBounds
+
+                // 将bounds当中的每个元素去解析成为ResolvableType
+                val resolvableBounds = Array(bounds.size) { forType(bounds[it], type.variableResolver) }
+
+                // 构建WildcardBounds对象
+                return WildcardBounds(kind, resolvableBounds)
+            }
+        }
+
+        /**
+         * 泛型的通配符类型的枚举值(协变UPPER/逆变LOWER)
+         */
+        enum class Kind {
+
+            /**
+             * <? extends T>(Kotlin当中的<out T>)的情况, 协变
+             */
+            UPPER,
+
+            /**
+             * <? super T>(Kotlin当中的<in T>)的情况, 逆变
+             */
+            LOWER
+        }
     }
 }

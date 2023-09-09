@@ -5,6 +5,7 @@ import com.wanna.framework.core.ResolvableType
 import com.wanna.framework.lang.Nullable
 import com.wanna.framework.util.ClassUtils
 import java.io.Serializable
+import java.lang.reflect.AnnotatedElement
 import java.lang.reflect.Field
 
 /**
@@ -18,12 +19,62 @@ import java.lang.reflect.Field
  * @see ConversionService.canConvert
  * @see ConversionService.convert
  */
-open class TypeDescriptor(val resolvableType: ResolvableType) :
-    Serializable {
+open class TypeDescriptor(
+    val resolvableType: ResolvableType,
+    val type: Class<*>,
+    private val annotatedElement: AnnotatedElementAdapter
+) : Serializable {
 
-    constructor(property: Property) : this(ResolvableType.forClass(property.type))
+    /**
+     * 基于Property去构建TypeDescriptor
+     *
+     * @param property Property
+     */
+    constructor(property: Property) : this(
+        ResolvableType.forMethodParameter(property.methodParameter),
+        ResolvableType.forMethodParameter(property.methodParameter).resolve(property.type),
+        AnnotatedElementAdapter(property.annotations)
+    )
 
-    val type: Class<*> = resolvableType.resolve(Any::class.java)
+    /**
+     * 基于字段Field去构建TypeDescriptor
+     *
+     * @param field Field
+     */
+    constructor(field: Field) : this(
+        ResolvableType.forField(field),
+        ResolvableType.forField(field).resolve(field.type),
+        AnnotatedElementAdapter(field.annotations)
+    )
+
+    /**
+     * 基于方法参数去构建TypeDescriptor
+     *
+     * @param methodParameter 方法参数MethodParameter
+     */
+    constructor(methodParameter: MethodParameter) : this(
+        ResolvableType.forMethodParameter(methodParameter),
+        ResolvableType.forMethodParameter(methodParameter).resolve(methodParameter.getNestedParameterType()),
+        AnnotatedElementAdapter(
+            // -1代表方法返回值, 直接取方法上的注解信息
+            if (methodParameter.getParameterIndex() == -1) methodParameter.getMethodAnnotations()
+            else methodParameter.getAnnotations()
+        )
+    )
+
+    /**
+     * 基于ResolvableType和type和annotations去进行构建TypeDescriptor
+     *
+     * @param resolvableType ResolvableType
+     * @param type type, 为null的话, 可以根据ResolvableType去进行计算
+     * @param annotations 注解信息
+     */
+    constructor(resolvableType: ResolvableType, type: Class<*>?, annotations: Array<Annotation>) : this(
+        resolvableType,
+        type ?: resolvableType.toClass(),
+        AnnotatedElementAdapter(annotations)
+    )
+
 
     /**
      * 获取集合/数组元素类型的描述符
@@ -33,14 +84,60 @@ open class TypeDescriptor(val resolvableType: ResolvableType) :
     @Nullable
     open fun getElementTypeDescriptor(): TypeDescriptor? {
         if (type.isArray) {
-            return TypeDescriptor(ResolvableType.forClass(type.componentType))
+            return TypeDescriptor(this.resolvableType.getComponentType(), null, getAnnotations())
         } else if (ClassUtils.isAssignFrom(Collection::class.java, type)) {
-            return TypeDescriptor(resolvableType.asCollection().getGenerics()[0])
+            return TypeDescriptor(this.resolvableType.asCollection().getGenerics()[0], null, getAnnotations())
         }
         return null
     }
 
+    open fun getAnnotations(): Array<Annotation> {
+        return annotatedElement.annotations
+    }
+
+    /**
+     * AnnotatedElement的适配器, 通过将给定的注解数组, 去包装适配成为AnnotatedElement
+     *
+     * @param annotations 待适配的注解列表
+     */
+    class AnnotatedElementAdapter(private val annotations: Array<Annotation>?) : AnnotatedElement,
+        Serializable {
+
+        override fun isAnnotationPresent(annotationClass: Class<out Annotation>): Boolean {
+            for (annotation in getAnnotations()) {
+                if (annotation.annotationClass.java == annotationClass) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : Annotation?> getAnnotation(annotationClass: Class<T>): T? {
+            for (annotation in getAnnotations()) {
+                if (annotation.annotationClass.java == annotationClass) {
+                    return annotation as T
+                }
+            }
+            return null
+        }
+
+        override fun getAnnotations(): Array<Annotation> {
+            return this.annotations ?: EMPTY_ANNOTATION_ARRAY
+        }
+
+        override fun getDeclaredAnnotations(): Array<Annotation> {
+            return getAnnotations()
+        }
+    }
+
     companion object {
+
+        /**
+         * 空的注解数组常量
+         */
+        @JvmStatic
+        private val EMPTY_ANNOTATION_ARRAY = emptyArray<Annotation>()
 
         @JvmStatic
         private val CACHED_COMMON_TYPES = arrayOf(
@@ -80,21 +177,37 @@ open class TypeDescriptor(val resolvableType: ResolvableType) :
 
             // 如果是基础数据类型, 直接走缓存去进行获取
             val desc = commonTypesCache[type]
-            return desc ?: TypeDescriptor(ResolvableType.forClass(type))
-        }
-
-        @JvmStatic
-        fun forMethodParameter(parameter: MethodParameter): TypeDescriptor {
-            return TypeDescriptor(ResolvableType.forMethodParameter(parameter))
-        }
-
-        @JvmStatic
-        fun forField(field: Field): TypeDescriptor {
-            return TypeDescriptor(ResolvableType.forField(field))
+            return desc ?: TypeDescriptor(
+                ResolvableType.forClass(type),
+                type,
+                AnnotatedElementAdapter(type.annotations)
+            )
         }
 
         /**
-         * 为给定的类去获取到[TypeDescriptor]
+         * 为给定的方法参数去构建TypeDescriptor
+         *
+         * @param parameter 方法参数MethodParameter
+         * @return 针对该方法参数去进行构建的类型描述信息TypeDescriptor
+         */
+        @JvmStatic
+        fun forMethodParameter(parameter: MethodParameter): TypeDescriptor {
+            return TypeDescriptor(parameter)
+        }
+
+        /**
+         * 为给定的字段去构建TypeDescriptor
+         *
+         * @param field Field字段
+         * @return 针对该字段去进行构建的类型描述信息TypeDescriptor
+         */
+        @JvmStatic
+        fun forField(field: Field): TypeDescriptor {
+            return TypeDescriptor(field)
+        }
+
+        /**
+         * 为给定的类去获取到类型的描述信息的[TypeDescriptor]
          *
          * @param type type
          * @return TypeDescriptor
@@ -110,11 +223,6 @@ open class TypeDescriptor(val resolvableType: ResolvableType) :
          */
         @JvmStatic
         fun forObject(source: Any): TypeDescriptor = valueOf(source.javaClass)
-
-        @JvmStatic
-        fun forClassWithGenerics(clazz: Class<*>, vararg generics: Class<*>): TypeDescriptor {
-            return TypeDescriptor(ResolvableType.forClassWithGenerics(clazz, *generics))
-        }
     }
 
 }
