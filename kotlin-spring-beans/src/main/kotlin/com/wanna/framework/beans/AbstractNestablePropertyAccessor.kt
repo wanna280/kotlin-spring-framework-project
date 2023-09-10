@@ -356,6 +356,8 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
                 }
             }
             val indexedPropertyName = StringBuilder(propertyName)
+
+            // 遍历所有层级的Key去进行处理, 后一层级的计算基于前一层级的value去进行计算...
             for (i in 0 until tokens.keys!!.size) {
                 val key = tokens.keys!![i]
                 if (value == null) {
@@ -393,11 +395,12 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
                         }
                     }
                 } else if (value is Map<*, *>) {
-                    // TODO, not supported nested, only support string
-                    val elementType = String::class.java
-                    // 对Key去进行convert
+                    // 获取内部嵌套的泛型的Key
+                    val mapKeyType = ph.getResolvableType().getNested(i + 1).asMap().resolveGeneric(0)
+                    val typeDescriptor = TypeDescriptor.valueOf(mapKeyType)
+                    // 对Key去进行convert, 转换成为目标类型的Key, 再根据Key从Map当中取元素
                     val convertedKey =
-                        convertIfNecessary(null, null, key, elementType, TypeDescriptor.forClass(elementType))
+                        convertIfNecessary(null, null, key, mapKeyType, typeDescriptor)
                     value = value[convertedKey]
                 } else {
                     throw InvalidPropertyException(
