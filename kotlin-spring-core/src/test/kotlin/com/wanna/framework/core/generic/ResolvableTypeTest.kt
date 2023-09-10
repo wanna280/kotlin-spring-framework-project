@@ -43,6 +43,8 @@ open class ResolvableTypeImpl : ResolvableTypeBase<String>() {
     // 测试Kotlin当中, 某些情况下, 针对泛型T去转换成为<? extends T>的情况
     private var baseKt: List<ResolvableTypeImpl>? = null
     private var baseKt2: Converter<ResolvableTypeImpl, ResolvableTypeImpl>? = null
+
+    private var unresolvedGenericsMap: Map<*, *>? = null
 }
 
 
@@ -256,6 +258,25 @@ class ResolvableTypeTest {
         assert(baseKt.getGenerics()[0].getType() is WildcardType)
         assert(baseKt2.getGenerics()[0].getType() !is WildcardType)
         assert(baseKt2.getGenerics()[0].getType() is Class<*>)
+    }
+
+    /**
+     * 测试ResolvableType对于无法被解析的泛型的方法
+     */
+    @Test
+    fun testResolvableTypeUnresolvableGenerics() {
+        // Map<*, *>
+        val unresolvedGenericsMap =
+            ResolvableType.forField(ResolvableTypeImpl::class.java.getDeclaredField("unresolvedGenericsMap"))
+        assert(unresolvedGenericsMap.hasUnresolvableGenerics())
+
+        // HashMap<String, Integer>
+        val resolvableType = ResolvableType.forField(ResolvableTypeImpl::class.java.getDeclaredField("map"))
+        assert(!resolvableType.hasUnresolvableGenerics())
+
+        // ResolvableTypeBase<T>
+        val baseResolvableType = ResolvableType.forClass(ResolvableTypeBase::class.java)
+        assert(baseResolvableType.hasUnresolvableGenerics())
     }
 
 }
