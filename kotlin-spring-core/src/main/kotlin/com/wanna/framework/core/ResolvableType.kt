@@ -790,7 +790,20 @@ open class ResolvableType {
         }
 
         /**
-         * 基于给定的Field, 去为该类型解析成为ResolvableType
+         * 基于给定的Class以及它的实现类implementingClass, 去解析成为[ResolvableType]
+         *
+         * @param baseType baseType
+         * @param implementingClass baseType的实现类
+         * @return 解析得到的[ResolvableType]
+         */
+        @JvmStatic
+        fun forClass(baseType: Class<*>, implementingClass: Class<*>): ResolvableType {
+            val asType = forType(implementingClass).`as`(baseType)
+            return if (asType == NONE) forType(baseType) else asType
+        }
+
+        /**
+         * 基于给定的Field, 去为该类型解析成为[ResolvableType]
          *
          * @param field 要去进行解析的字段
          * @return 为该字段解析得到的ResolvableType
@@ -801,7 +814,7 @@ open class ResolvableType {
         }
 
         /**
-         * 指定Field以及该Field的实现类, 从而去解析成为ResolvableType,
+         * 指定Field以及该Field的实现类, 从而去解析成为[ResolvableType],
          * 有可能父类定义了一个T[]的字段, 具体的类型是子类给定的, 如果没有子类, 这个T[]的类型就无法被解析出来,
          * 但是提供了子类之后, 我们可以基于子类, 去解析父类的泛型, 从而解析得到这个T
          *
@@ -843,7 +856,7 @@ open class ResolvableType {
         }
 
         /**
-         * 针对给定的Type去解析成为ResolvableType
+         * 针对给定的[Type]去解析成为[ResolvableType]
          *
          * @param type type
          * @return 解析得到的ResolvableType
@@ -854,7 +867,7 @@ open class ResolvableType {
         }
 
         /**
-         * 针对给定的Type去解析成为ResolvableType
+         * 针对给定的[Type]去解析成为[ResolvableType]
          *
          * @param type type
          * @param owner 该type对应的Owner, 比如字段对应的具体实现类
@@ -866,7 +879,7 @@ open class ResolvableType {
         }
 
         /**
-         * 针对给定的Type去解析成为ResolvableType
+         * 针对给定的[Type]去解析成为[ResolvableType]
          *
          * @param type type
          * @param variableResolver 提供对于TypeVariable的解析的解析器(很可能由owner提供, 让子类去解析父类的泛型信息)
@@ -881,7 +894,7 @@ open class ResolvableType {
         }
 
         /**
-         * 针对给定的Type去解析成为ResolvableType
+         * 针对给定的[Type]去解析成为[ResolvableType]
          *
          * @param type type
          * @param typeProvider typeProvider(如果type为null, 支持从typeProvider当中去进行getType)
@@ -946,7 +959,7 @@ open class ResolvableType {
         }
 
         /**
-         * 将一个方法参数类型去转换为ResolvableType
+         * 将一个方法参数类型[MethodParameter]去转换为[ResolvableType]
          *
          * @param methodParameter 方法参数(包装了jdk的Parameter)
          * @return 方法参数(来自jdk的Parameter)转换得到的ResolvableType
@@ -957,7 +970,7 @@ open class ResolvableType {
         }
 
         /**
-         * 将一个方法参数去转换成为ResolvableType
+         * 将一个方法参数[MethodParameter]去转换成为[ResolvableType]
          *
          * @param methodParameter 方法参数
          * @param targetType targetType
@@ -969,7 +982,7 @@ open class ResolvableType {
         }
 
         /**
-         * 将一个方法参数去转换成为ResolvableType
+         * 将一个方法参数[MethodParameter]去转换成为[ResolvableType]
          *
          * @param methodParameter 方法参数
          * @param implementationType 该方法参数对应的实现类的类型
@@ -993,7 +1006,7 @@ open class ResolvableType {
         }
 
         /**
-         * 将一个方法参数类型的指定泛型嵌套级别的参数, 去转换成为ResolvableType
+         * 将一个方法参数类型[MethodParameter]的指定泛型嵌套级别的参数, 去转换成为[ResolvableType]
          *
          * @param methodParameter 方法参数
          * @param nestingLevel 泛型参数嵌套级别
@@ -1024,7 +1037,7 @@ open class ResolvableType {
         }
 
         /**
-         * 给定目标类和该类的泛型信息泛型, 去构建[ResolvableType]
+         * 给定目标类和该类的泛型信息泛型, 去解析并构建[ResolvableType]
          *
          * @param resolvableType 目标类
          * @param generics 该类的泛型列表
