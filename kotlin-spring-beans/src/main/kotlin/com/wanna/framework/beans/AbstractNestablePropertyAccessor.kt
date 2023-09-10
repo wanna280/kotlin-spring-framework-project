@@ -600,7 +600,7 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
         } catch (ex: Throwable) {
             throw NullValueInNestedPathException(
                 getRootClass(), this.nestedPath + name,
-                "Could not instantiate property type [" + type.getName() + "] to auto-grow nested property path", ex
+                "Could not instantiate property type [" + type.name + "] to auto-grow nested property path", ex
             )
         }
     }
@@ -674,7 +674,7 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
         if (keys.isNotEmpty()) {
             // 生成canonicalName, 生成格式为"address[0][1]"这样的格式
             token.canonicalName += PROPERTY_KEY_PREFIX +
-                    StringUtils.collectionToCommaDelimitedString(keys, PROPERTY_KEY_PREFIX + PROPERTY_KEY_SUFFIX) +
+                    StringUtils.collectionToCommaDelimitedString(keys, PROPERTY_KEY_SUFFIX + PROPERTY_KEY_PREFIX) +
                     PROPERTY_KEY_SUFFIX
             token.keys = keys.toTypedArray()
         }
