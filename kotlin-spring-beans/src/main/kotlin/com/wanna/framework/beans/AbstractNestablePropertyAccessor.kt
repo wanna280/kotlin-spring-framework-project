@@ -300,11 +300,17 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
     /**
      * 为给定的propertyPath去获取到对应的[PropertyAccessor], 提供属性的访问
      *
+     * 以"user.config.ext.xxx"这个propertyPath作为例子, 去模拟一下执行流程
+     * * 1.第一次进来时, propertyPath="user.config.ext.xxx", nestedPath为"user", 那么尝试去获取到"user"字段
+     * * 2.第二次进来时, propertyPath="config.ext.xxx", nestedPath为"config", 那么尝试去获取到"user"字段的对象内部的"config"字段
+     * * 3.第三次进来时, propertyPath="ext.xxx", nestedPath为"ext", 那么尝试去获取"config"字段的对象内部的"ext"字段
+     * * 4.第四次进来时, propertyPath="xxx", 不需要nestedPath了, 直接返回this, 我们需要返回的其实就是这个"ext字段"
+     *
      * @param propertyPath propertyPath
      * @return 提供对于给定的propertyPath的属性的访问的[PropertyAccessor]
      */
     protected open fun getPropertyAccessorForPropertyPath(propertyPath: String): AbstractNestablePropertyAccessor {
-        // 获取到propertyPath当中的"."的位置
+        // 获取到propertyPath当中的第一个"."的位置
         val pos = PropertyAccessorUtils.getFirstNestedPropertySeparatorIndex(propertyPath)
 
         // 如果存在有".", 那么说明是嵌套属性的情况
@@ -636,7 +642,9 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
     }
 
     /**
-     * 为给定的propertyName去转换成为[PropertyTokenHolder]
+     * 为给定的propertyName去转换成为[PropertyTokenHolder],
+     * 这里需要去进行处理的是propertyName, 不会包含有"."这种情况, 只是有可能有"key", "key[0]", "key[0][0]"等这些情况,
+     * 我们需要对这种情况去进行语法解析, 解析成为[PropertyTokenHolder]对象, 把indexed/mapped的这部分拆分出来, 方便后续去进行使用
      *
      * @param propertyName 待转换的propertyName
      * @return 转换之后得到的PropertyTokenHolder
@@ -716,7 +724,10 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
      */
     @Suppress("UNCHECKED_CAST")
     private fun processKeyedProperty(tokens: PropertyTokenHolder, pv: PropertyValue) {
+        // 拿到当前的tokens对应的propertyPath所持有的对象, 例如对应"users[0]", 那么在这儿应该可以拿到的是users这个字段的属性值
         val propValue = getPropertyHoldingValue(tokens)
+
+        // 获取当前这个字段对应的属性值的Handler, 用来处理actualName对应的getter/setter
         val ph = getLocalPropertyHandler(tokens.actualName)
             ?: throw InvalidPropertyException(
                 getRootClass(),
@@ -725,6 +736,8 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
             )
         val keys = tokens.keys!!
         val lastKey = keys[keys.size - 1]
+
+        // 如果所持有的propValue是数组, 那么说明需要将当前pv去添加到数组当中
         if (propValue.javaClass.isArray) {
             var propValueToUse = propValue
             val componentType = propValue.javaClass.componentType
@@ -757,10 +770,10 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
                 propValueToUse = newArray
             }
 
-            // 反射把index对应位置的值设置进去
+            // 反射把当前需要插入的(index对应位置)值设置进去
             java.lang.reflect.Array.set(propValueToUse, index, convertedValue)
 
-            // 如果是List的话
+            // 如果所持有的propValue对象是List的话, 需要把当前pv插入到List当中
         } else if (propValue is List<*>) {
             val elementType = ph.getCollectionType(keys.size)
             val list = propValue as MutableList<Any?>
@@ -781,22 +794,29 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
             // 如果之前的length不够, 那么进行自动扩充, 扩充到足够为止...
             val size = propValue.size
             if (index in size until autoGrowCollectionLimit) {
+                // 对于中间的元素全部填充null
                 for (i in size until index) {
                     list.add(null)
                 }
+                // 把list扩容完成之后, 把convertedValue去添加到最后
                 list.add(convertedValue)
             } else {
+                // length足够了, 那么直接插入到List当中就行...
                 list[index] = convertedValue
             }
+
+            // 如果所持有的propValue对象是Map的话, 那么需要将该元素添加到Map当中...
         } else if (propValue is Map<*, *>) {
             val mapKeyType = ph.getMapKeyType(keys.size)
             val mapValueType = ph.getMapValueType(keys.size)
 
+            // 对key去进行转换, key其实就是tokens当中的最后一个key
             val convertedMapKey =
                 convertIfNecessary(null, null, lastKey, mapKeyType, TypeDescriptor.valueOf(mapKeyType))
 
             val oldValue = if (extractOldValueForEditor) propValue[convertedMapKey] else null
 
+            // 对value去进行转换, value其实就是pv.value
             val convertedMapValue =
                 convertIfNecessary(
                     tokens.canonicalName,
@@ -806,6 +826,7 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
                     ph.nested(keys.size)!!
                 )
 
+            // 将该元素插入到Map当中...
             (propValue as MutableMap<Any?, Any?>)[convertedMapKey] = convertedMapValue
         }
 
