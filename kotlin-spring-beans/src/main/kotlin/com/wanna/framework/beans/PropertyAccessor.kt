@@ -119,4 +119,21 @@ interface PropertyAccessor {
      * @param pvs 要进行设置的属性值列表
      */
     fun setPropertyValues(pvs: Map<String, Any?>)
+
+    /**
+     * 批量执行属性值的设置
+     *
+     * @param pvs 要去进行设置的属性值列表
+     * @param ignoreUnknown 是否我们要忽略那些在Bean当中没有找到的属性值?
+     */
+    fun setPropertyValues(pvs: PropertyValues, ignoreUnknown: Boolean)
+
+    /**
+     * 批量执行属性值的设置
+     *
+     * @param pvs 要去进行设置的属性值列表
+     * @param ignoreUnknown 是否我们要忽略那些在Bean当中没有找到的属性值?
+     * @param ignoreInvalid 是否需要忽略那些不合法的属性值(找到了, 但是无法去进行setter访问)
+     */
+    fun setPropertyValues(pvs: PropertyValues, ignoreUnknown: Boolean, ignoreInvalid: Boolean)
 }

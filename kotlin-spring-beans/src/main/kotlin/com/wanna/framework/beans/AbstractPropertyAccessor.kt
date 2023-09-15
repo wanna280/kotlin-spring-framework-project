@@ -52,15 +52,6 @@ abstract class AbstractPropertyAccessor : TypeConverterSupport(), ConfigurablePr
     }
 
     /**
-     * 给定一个PropertyValues列表, 对所有的属性值去进行属性值的设置
-     *
-     * @param pvs PropertyValue列表
-     */
-    override fun setPropertyValues(pvs: PropertyValues) {
-        pvs.getPropertyValues().forEach(::setPropertyValue)
-    }
-
-    /**
      * 以Map的方式去给定一个PropertyValues列表, 对所有的属性值去进行属性值的设置
      *
      * @param pvs PropertyValue列表(Map<K,V>)
@@ -68,6 +59,38 @@ abstract class AbstractPropertyAccessor : TypeConverterSupport(), ConfigurablePr
     override fun setPropertyValues(pvs: Map<String, Any?>) {
         // wrap to PropertyValues, 这样就是共用一套逻辑了
         setPropertyValues(MutablePropertyValues(pvs))
+    }
+
+    /**
+     * 给定一个PropertyValues列表, 对所有的属性值去进行属性值的设置
+     *
+     * @param pvs PropertyValue列表
+     */
+    override fun setPropertyValues(pvs: PropertyValues) {
+        setPropertyValues(pvs, false, false)
+    }
+
+    /**
+     * 给定一个PropertyValues列表, 对所有的属性值去进行属性值的设置
+     *
+     * @param pvs PropertyValue列表
+     * @param ignoreUnknown 是否我们要忽略那些在Bean当中没有找到的属性值?
+     */
+    override fun setPropertyValues(pvs: PropertyValues, ignoreUnknown: Boolean) {
+        setPropertyValues(pvs, ignoreUnknown, false)
+    }
+
+    /**
+     * 给定一个PropertyValues列表, 对所有的属性值去进行属性值的设置
+     *
+     * @param pvs PropertyValue列表
+     * @param ignoreUnknown 是否我们要忽略那些在Bean当中没有找到的属性值?
+     * @param ignoreInvalid 是否需要忽略那些不合法的属性值(找到了, 但是无法去进行setter访问)
+     */
+    override fun setPropertyValues(pvs: PropertyValues, ignoreUnknown: Boolean, ignoreInvalid: Boolean) {
+        for (propertyValue in pvs.getPropertyValues()) {
+            setPropertyValue(propertyValue)
+        }
     }
 
     /**
