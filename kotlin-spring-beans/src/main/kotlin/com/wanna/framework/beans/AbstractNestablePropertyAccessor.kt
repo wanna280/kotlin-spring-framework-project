@@ -1,5 +1,6 @@
 package com.wanna.framework.beans
 
+import com.wanna.common.logging.LoggerFactory
 import com.wanna.framework.beans.PropertyAccessor.Companion.NESTED_PROPERTY_SEPARATOR_CHAR
 import com.wanna.framework.beans.PropertyAccessor.Companion.PROPERTY_KEY_PREFIX
 import com.wanna.framework.beans.PropertyAccessor.Companion.PROPERTY_KEY_PREFIX_CHAR
@@ -11,11 +12,8 @@ import com.wanna.framework.core.convert.TypeDescriptor
 import com.wanna.framework.lang.Nullable
 import com.wanna.framework.util.ClassUtils
 import com.wanna.framework.util.StringUtils
-import com.wanna.common.logging.LoggerFactory
-import java.lang.StringBuilder
 import java.lang.reflect.Modifier
-import java.util.Optional
-import kotlin.jvm.Throws
+import java.util.*
 
 
 /**
@@ -55,7 +53,7 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
     /**
      * 当前[PropertyAccessor]所在的嵌套的路径
      */
-    private var nestedPath = ""
+    protected var nestedPath = ""
 
     /**
      * 维护当前的[PropertyAccessor]对应的嵌套的[PropertyAccessor]列表, Key-nestedPath, Value是该nestedPath的[PropertyAccessor]
@@ -360,6 +358,9 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
             // 遍历所有层级的Key去进行处理, 后一层级的计算基于前一层级的value去进行计算...
             for (i in 0 until tokens.keys!!.size) {
                 val key = tokens.keys!![i]
+
+                // 如果遇到了上一个层级的结果就已经取不到值了的情况, 比如"Map<String, Map<String, String>> map"
+                // 尝试获取map[key1][key2]的情况, 因为通过map[key]就取不到value了, 我们直接丢异常...
                 if (value == null) {
                     throw NullValueInNestedPathException(
                         getRootClass(),
@@ -531,7 +532,8 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
             return
         }
         if (index >= collection.size && index < autoGrowCollectionLimit) {
-            val elementType: Class<*>? = Any::class.java  // TODO nesting not support
+            val elementType: Class<*>? =
+                ph.getResolvableType().getNested(nestingLevel).asCollection().resolveGeneric()
             if (elementType != null) {
                 for (i in collection.size..index) {
                     (collection as MutableCollection<Any?>).add(newValue(elementType, null, name))
@@ -712,8 +714,8 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
      * @param tokens 解析完成得到的tokens
      * @param pv 要去进行设置的PropertyValue
      */
+    @Suppress("UNCHECKED_CAST")
     private fun processKeyedProperty(tokens: PropertyTokenHolder, pv: PropertyValue) {
-        // TODO
         val propValue = getPropertyHoldingValue(tokens)
         val ph = getLocalPropertyHandler(tokens.actualName)
             ?: throw InvalidPropertyException(
@@ -721,14 +723,90 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
                 this.nestedPath + tokens.actualName,
                 "No PropertyHandler found"
             )
-
-        val lastKey = tokens.keys!![tokens.keys!!.size - 1]
+        val keys = tokens.keys!!
+        val lastKey = keys[keys.size - 1]
         if (propValue.javaClass.isArray) {
+            var propValueToUse = propValue
+            val componentType = propValue.javaClass.componentType
 
+            val index = lastKey.toInt()
+
+            // 根据index去获取到oldValue
+            val oldValue = if (extractOldValueForEditor) java.lang.reflect.Array.get(propValue, index) else null
+
+            // 对新属性值完成类型转换
+            val convertedValue = convertIfNecessary(
+                tokens.canonicalName,
+                oldValue,
+                pv.value,
+                componentType,
+                ph.nested(keys.size)!!
+            )
+
+            val length = java.lang.reflect.Array.getLength(propValue)
+            if (index in length until autoGrowCollectionLimit) {
+                val newArray = java.lang.reflect.Array.newInstance(componentType, index + 1)
+                System.arraycopy(propValue, 0, newArray, 0, length)
+
+                val lastKeyIndex = tokens.canonicalName.lastIndexOf('[')
+                val propName = tokens.canonicalName.substring(0, lastKeyIndex)
+
+                // 把新数组去设置到属性当中...
+                setPropertyValue(propName, newArray)
+
+                propValueToUse = newArray
+            }
+
+            // 反射把index对应位置的值设置进去
+            java.lang.reflect.Array.set(propValueToUse, index, convertedValue)
+
+            // 如果是List的话
         } else if (propValue is List<*>) {
+            val elementType = ph.getCollectionType(keys.size)
+            val list = propValue as MutableList<Any?>
+            val index = lastKey.toInt()
 
+            // 提取oldValue
+            val oldValue = if (extractOldValueForEditor) list[index] else null
+
+            // 对pv完成类型转换
+            val convertedValue = convertIfNecessary(
+                tokens.canonicalName,
+                oldValue,
+                pv.value,
+                elementType,
+                ph.nested(keys.size)!!
+            )
+
+            // 如果之前的length不够, 那么进行自动扩充, 扩充到足够为止...
+            val size = propValue.size
+            if (index in size until autoGrowCollectionLimit) {
+                for (i in size until index) {
+                    list.add(null)
+                }
+                list.add(convertedValue)
+            } else {
+                list[index] = convertedValue
+            }
         } else if (propValue is Map<*, *>) {
+            val mapKeyType = ph.getMapKeyType(keys.size)
+            val mapValueType = ph.getMapValueType(keys.size)
 
+            val convertedMapKey =
+                convertIfNecessary(null, null, lastKey, mapKeyType, TypeDescriptor.valueOf(mapKeyType))
+
+            val oldValue = if (extractOldValueForEditor) propValue[convertedMapKey] else null
+
+            val convertedMapValue =
+                convertIfNecessary(
+                    tokens.canonicalName,
+                    oldValue,
+                    pv.value,
+                    mapValueType,
+                    ph.nested(keys.size)!!
+                )
+
+            (propValue as MutableMap<Any?, Any?>)[convertedMapKey] = convertedMapValue
         }
 
     }
@@ -739,7 +817,31 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
      * @param tokens tokens
      */
     private fun getPropertyHoldingValue(tokens: PropertyTokenHolder): Any {
-        return Any()
+        val getterTokens = PropertyTokenHolder(tokens.actualName)
+        getterTokens.canonicalName = tokens.canonicalName
+        // copy all keys except last one(copy前n-1个key元素)
+        getterTokens.keys = Array(tokens.keys!!.size - 1) { tokens.keys!![it] }
+
+        // 根据前n-1个元素, 去进行获取到对应的对象
+        var propValue: Any? = null
+        try {
+            propValue = getPropertyValue(getterTokens)
+        } catch (ex: Throwable) {
+            // TODO
+        }
+
+        if (propValue == null) {
+            if (autoGrowNestedPaths) {
+                val lastKeyIndex = tokens.canonicalName.lastIndexOf('[')
+                getterTokens.canonicalName = tokens.canonicalName.substring(0, lastKeyIndex)
+                propValue = setDefaultValue(getterTokens)
+            } else {
+                // TODO
+                throw IllegalStateException("")
+            }
+        }
+
+        return propValue
     }
 
     /**
@@ -791,6 +893,39 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
         val readable: Boolean,
         val writeable: Boolean
     ) {
+
+        /**
+         * 获取指定的嵌套级别的Map泛型参数, 并获取到Map的KeyType
+         *
+         * @param nestingLevel 嵌套层级
+         * @return 获取到的Map泛型参数的KeyType(or null)
+         */
+        @Nullable
+        open fun getMapKeyType(nestingLevel: Int): Class<*>? {
+            return getResolvableType().getNested(nestingLevel).asMap().resolveGeneric(0)
+        }
+
+        /**
+         * 获取指定的嵌套级别的Map泛型参数, 并获取到Map的ValueType
+         *
+         * @param nestingLevel 嵌套层级
+         * @return 获取到的Map泛型参数的ValueType(or null)
+         */
+        @Nullable
+        open fun getMapValueType(nestingLevel: Int): Class<*>? {
+            return getResolvableType().getNested(nestingLevel).asMap().resolveGeneric(1)
+        }
+
+        /**
+         * 获取指定的嵌套级别的Collection泛型参数, 并获取到Collection的元素类型
+         *
+         * @param nestingLevel 嵌套层级
+         * @return 获取到的Collection的元素类型(or null)
+         */
+        @Nullable
+        open fun getCollectionType(nestingLevel: Int): Class<*>? {
+            return getResolvableType().getNested(nestingLevel).asCollection().resolveGeneric()
+        }
 
         /**
          * 获取到这个属性的类型的[ResolvableType]

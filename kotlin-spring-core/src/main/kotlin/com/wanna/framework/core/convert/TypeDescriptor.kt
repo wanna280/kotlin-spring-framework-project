@@ -223,6 +223,64 @@ open class TypeDescriptor(
          */
         @JvmStatic
         fun forObject(source: Any): TypeDescriptor = valueOf(source.javaClass)
+
+
+        /**
+         * 根据[Property]以及要去进行嵌套的泛型参数层级信息, 去构建[TypeDescriptor]
+         *
+         * @param property Property
+         * @param nestingLevel 属性的泛型参数嵌套级别
+         */
+        @JvmStatic
+        @Nullable
+        fun nested(property: Property, nestingLevel: Int): TypeDescriptor? {
+            return nested(TypeDescriptor(property), nestingLevel)
+        }
+
+        /**
+         * 将给定的[TypeDescriptor]的泛型参数, 切换到指定的嵌套层级
+         *
+         * @param typeDescriptor TypeDescriptor
+         * @param nestingLevel 嵌套层级
+         * @return 对应的嵌套层级的新的TypeDescriptor
+         */
+        @JvmStatic
+        @Nullable
+        private fun nested(typeDescriptor: TypeDescriptor, nestingLevel: Int): TypeDescriptor? {
+            var nested = typeDescriptor.resolvableType
+            for (i in 0 until nestingLevel) {
+                if (nested.getType() == Any::class.java) {
+                    // Could be a collection type but we don't know about its element type,
+                    // so let's just assume there is an element type of type Object...
+                } else {
+                    nested = nested.getNested(2)
+                }
+            }
+            if (nested == ResolvableType.NONE) {
+                return null
+            }
+            // 根据Nested的ResolvableType去构建新的TypeDescriptor
+            // 对于注解信息, 直接沿用原始的TypeDescriptor
+            return getRelatedIfResolvable(typeDescriptor, nested)
+        }
+
+        /**
+         * 如果给定的[ResolvableType]可以解析的话, 那么返回相对于[TypeDescriptor]的新的[TypeDescriptor],
+         * 原因在于对于方法参数的注解, 和嵌套的泛型参数的注解信息, 应该复用, 也就是相当于返回相对于原始的[TypeDescriptor]
+         * 的嵌套的新的[TypeDescriptor]
+         *
+         * @param source 原始的TypeDescriptor, 用于copy注解信息
+         * @param type 要去进行构建TypeDescriptor的ResolvableType
+         * @return 构建出来的相当于source的新的TypeDescriptor(如果无法解析的话, 那么return null)
+         */
+        @JvmStatic
+        @Nullable
+        private fun getRelatedIfResolvable(source: TypeDescriptor, type: ResolvableType): TypeDescriptor? {
+            if (type.resolve() == null) {
+                return null
+            }
+            return TypeDescriptor(type, null, source.getAnnotations())
+        }
     }
 
 }

@@ -97,9 +97,19 @@ open class BeanWrapperImpl() : BeanWrapper, AbstractNestablePropertyAccessor() {
      * @return wrappedClass当中的给定的propertyName的属性值
      * @throws InvalidPropertyException 如果给定的属性名的[PropertyDescriptor]无法获取到的话
      */
-    override fun getPropertyDescriptor(propertyName: String): PropertyDescriptor =
-        getCachedIntrospectionResults().getPropertyDescriptor(propertyName)
-            ?: throw InvalidPropertyException(getWrappedClass(), propertyName, "No such property")
+    override fun getPropertyDescriptor(propertyName: String): PropertyDescriptor {
+        val nestedBw = getPropertyAccessorForPropertyPath(propertyName)
+        val finalPath = getFinalPath(nestedBw, propertyName)
+        val pd =
+            (nestedBw as BeanWrapperImpl).getCachedIntrospectionResults().getPropertyDescriptor(finalPath)
+
+        return pd ?: throw InvalidPropertyException(
+            getRootClass(),
+            nestedPath + propertyName,
+            "No property '$propertyName' found"
+        )
+    }
+
 
     /**
      * 创建一个嵌套的[AbstractNestablePropertyAccessor]
@@ -186,9 +196,15 @@ open class BeanWrapperImpl() : BeanWrapper, AbstractNestablePropertyAccessor() {
          */
         override fun toTypeDescriptor(): TypeDescriptor = TypeDescriptor(property(pd))
 
+        /**
+         * 返回嵌套指定层级的泛型参数的[TypeDescriptor]
+         *
+         * @param level 要去获取的嵌套层级
+         * @return 当前属性对应的嵌套层级的TypeDescriptor
+         */
+        @Nullable
         override fun nested(level: Int): TypeDescriptor? {
-            // TODO
-            return null
+            return TypeDescriptor.nested(property(pd), level)
         }
 
         /**
