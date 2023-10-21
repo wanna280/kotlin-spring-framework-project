@@ -28,7 +28,7 @@ interface ConversionService {
      * @param targetType targetType(TypeDescriptor, 支持泛型的解析)
      * @return 如果能进行转换, return true; 不然return false
      */
-    fun canConvert(sourceType: TypeDescriptor, targetType: TypeDescriptor): Boolean
+    fun canConvert(@Nullable sourceType: TypeDescriptor?, targetType: TypeDescriptor): Boolean
 
     /**
      * 将source对象, 转换为目标类型(targetType)

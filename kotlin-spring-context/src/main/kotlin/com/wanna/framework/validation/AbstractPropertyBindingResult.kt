@@ -11,7 +11,9 @@ import com.wanna.framework.core.convert.ConversionService
  */
 abstract class AbstractPropertyBindingResult(objectName: String) : AbstractBindingResult(objectName) {
 
-    // ConversionService
+    /**
+     * ConversionService
+     */
     private var conversionService: ConversionService? = null
 
     /**

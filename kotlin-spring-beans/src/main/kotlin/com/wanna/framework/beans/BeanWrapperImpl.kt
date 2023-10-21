@@ -82,6 +82,14 @@ open class BeanWrapperImpl() : BeanWrapper, AbstractNestablePropertyAccessor() {
         this.setCachedIntrospectionResults(CachedIntrospectionResults.forClass(wrappedObject::class.java))
     }
 
+    override fun setAutoGrowCollectionLimit(autoGrowCollectionLimit: Int) {
+        super.setAutoGrowCollectionLimit(autoGrowCollectionLimit)
+    }
+
+    override fun getAutoGrowCollectionLimit(): Int {
+        return super.getAutoGrowCollectionLimit()
+    }
+
     /**
      * 获取到beanClass当中的所有属性列表
      *

@@ -1,5 +1,6 @@
 package com.wanna.framework.web.bind
 
+import com.wanna.framework.beans.MutablePropertyValues
 import com.wanna.framework.validation.DataBinder
 
 /**
@@ -8,6 +9,10 @@ import com.wanna.framework.validation.DataBinder
  * @see DataBinder
  */
 open class WebDataBinder(target: Any?, objectName: String) : DataBinder(target, objectName) {
+
+    override fun doBind(mpvs: MutablePropertyValues) {
+        super.doBind(mpvs)
+    }
 
 
 }

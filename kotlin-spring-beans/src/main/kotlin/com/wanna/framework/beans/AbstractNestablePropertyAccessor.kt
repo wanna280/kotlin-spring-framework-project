@@ -112,6 +112,14 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
      */
     open fun getRootClass(): Class<*> = getRootInstance().javaClass
 
+    open fun setAutoGrowCollectionLimit(autoGrowCollectionLimit: Int) {
+        this.autoGrowCollectionLimit = autoGrowCollectionLimit
+    }
+
+    open fun getAutoGrowCollectionLimit(): Int {
+        return this.autoGrowCollectionLimit
+    }
+
     /**
      * 检查给定的属性名对应的属性是否是一个可读的属性
      * Note: 当属性本身就不存在的话, return false
@@ -712,7 +720,7 @@ abstract class AbstractNestablePropertyAccessor() : AbstractPropertyAccessor() {
         val delegate = this.delegate ?: throw IllegalStateException("No TypeConverterDelegate")
 
         // 使用TypeConverterDelegate, 去完成类型转换
-        valueToApply = delegate.convertIfNecessary(propertyName, oldValue, valueToApply!!, td.type)
+        valueToApply = delegate.convertIfNecessary(propertyName, oldValue, valueToApply!!, td.type, td)
         return valueToApply
     }
 

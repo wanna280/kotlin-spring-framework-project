@@ -222,7 +222,11 @@ open class TypeDescriptor(
          * @return TypeDescriptor
          */
         @JvmStatic
-        fun forObject(source: Any): TypeDescriptor = valueOf(source.javaClass)
+        @Nullable
+        fun forObject(@Nullable source: Any?): TypeDescriptor? {
+            source ?: return null
+            return valueOf(source.javaClass)
+        }
 
 
         /**

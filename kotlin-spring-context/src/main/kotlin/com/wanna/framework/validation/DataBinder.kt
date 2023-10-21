@@ -6,7 +6,9 @@ import com.wanna.framework.core.convert.support.DefaultConversionService
 import com.wanna.framework.lang.Nullable
 import com.wanna.common.logging.Logger
 import com.wanna.common.logging.LoggerFactory
+import com.wanna.framework.core.MethodParameter
 import java.beans.PropertyEditor
+import java.lang.reflect.Field
 import java.util.*
 
 /**
@@ -23,6 +25,11 @@ open class DataBinder(private val target: Any?, private val objectName: String =
 
     companion object {
         private const val DEFAULT_OBJECT_NAME = "target"
+
+        /**
+         * 默认的数组(集合)最大增长的长度限制
+         */
+        const val DEFAULT_AUTO_GROW_COLLECTION_LIMIT = 256
     }
 
     /**
@@ -34,6 +41,20 @@ open class DataBinder(private val target: Any?, private val objectName: String =
      * TypeConverter
      */
     private val typeConverter = SimpleTypeConverter()
+
+    var ignoreUnknownFields = true
+
+    var ignoreInvalidFields = false
+
+    /**
+     * 是否支持自动增长嵌套的属性值对应的对象(List/Array)
+     */
+    var autoGrowNestedPaths = true
+
+    /**
+     * 数组(集合)的最大增长的长度限制
+     */
+    var autoGrowCollectionLimit = DEFAULT_AUTO_GROW_COLLECTION_LIMIT
 
     /**
      * ConversionService
@@ -47,7 +68,9 @@ open class DataBinder(private val target: Any?, private val objectName: String =
     @Nullable
     private var bindingResult: AbstractPropertyBindingResult? = null
 
-    // Validator列表, 用来提供参数的检验
+    /**
+     * Validator列表, 用来提供参数的检验
+     */
     private val validators = ArrayList<Validator>()
 
     init {
@@ -62,7 +85,7 @@ open class DataBinder(private val target: Any?, private val objectName: String =
     open fun getBindingResult(): BindingResult = getInternalBindingResult()
 
     /**
-     * 获取BindingResult, 如果没有的话, 需要提前完成创建
+     * 获取给[DataBinder]使用的[AbstractPropertyBindingResult], 如果没有的话, 需要提前完成创建
      *
      * @return 创建好的BindingResult
      */
@@ -70,23 +93,44 @@ open class DataBinder(private val target: Any?, private val objectName: String =
         if (this.bindingResult == null) {
             this.bindingResult = createBeanPropertyBindingResult()
         }
-        return bindingResult ?: throw AssertionError("不应该到达这里")
+        return bindingResult ?: throw AssertionError("Should not arrival here")
     }
 
     /**
-     * create BeanPropertyBindingResult
+     * 创建一个[AbstractPropertyBindingResult]对象, 用于去提供JavaBean的属性访问
+     *
+     * @return AbstractPropertyBindingResult
      */
-    open fun createBeanPropertyBindingResult(): AbstractPropertyBindingResult {
-        val result = BeanPropertyBindingResult(getTarget(), getObjectName())
+    protected open fun createBeanPropertyBindingResult(): AbstractPropertyBindingResult {
+        val result =
+            BeanPropertyBindingResult(getTarget(), getObjectName(), autoGrowNestedPaths, autoGrowCollectionLimit)
         Optional.ofNullable(conversionService).ifPresent(result::initConversion)
         return result
+    }
+
+    /**
+     * 执行对于属性值的绑定
+     *
+     * @param mpvs 要去进行把绑定的属性值列表
+     */
+    protected open fun doBind(mpvs: MutablePropertyValues) {
+        applyPropertyValues(mpvs)
+    }
+
+    /**
+     * 把属性值[MutablePropertyValues]去apply到要去进行绑定的目标对象当中
+     *
+     * @param mpvs 要去进行把绑定的属性值列表
+     */
+    protected open fun applyPropertyValues(mpvs: MutablePropertyValues) {
+        getPropertyAccessor().setPropertyValues(mpvs, ignoreUnknownFields, ignoreUnknownFields)
     }
 
     /**
      * 使用内部的Validator, 对内部的目标对象去进行检验
      */
     open fun validate() {
-        val target = getTarget() ?: throw IllegalStateException("要去进行绑定的目标对象不能为空")
+        val target = getTarget() ?: throw IllegalStateException("target cannot be null")
         val bindingResult = getBindingResult()
         validators.forEach { it.validate(target, bindingResult) }
     }
@@ -97,7 +141,7 @@ open class DataBinder(private val target: Any?, private val objectName: String =
      * @param validationHints JSR303的Validation的Hints
      */
     open fun validate(vararg validationHints: Any) {
-        val target = getTarget() ?: throw IllegalStateException("要去进行绑定的目标对象不能为空")
+        val target = getTarget() ?: throw IllegalStateException("target cannot be null")
         val bindingResult = getBindingResult()
         validators.forEach {
             if (validationHints.isNotEmpty() && it is SmartValidator) {
@@ -155,7 +199,7 @@ open class DataBinder(private val target: Any?, private val objectName: String =
      * @param validator 待断言的Validator
      */
     private fun assertValidator(validator: Validator) {
-        val target = getTarget() ?: throw IllegalStateException("要去进行绑定的目标对象不能为空")
+        val target = getTarget() ?: throw IllegalStateException("target cannot be null")
         if (validator.supports(target::class.java)) {
             throw IllegalStateException("添加的Validator不支持去处理这样的目标类型[${target::class.java}]")
         }
@@ -182,12 +226,24 @@ open class DataBinder(private val target: Any?, private val objectName: String =
         getTypeConverter().registerCustomEditor(requiredType, propertyEditor)
     }
 
-    override fun findCustomEditor(requiredType: Class<*>): PropertyEditor? {
+    override fun <T : Any> convertIfNecessary(value: Any?, requiredType: Class<T>?): T? {
+        return getTypeConverter().convertIfNecessary(value, requiredType)
+    }
+
+    override fun findCustomEditor(requiredType: Class<*>?): PropertyEditor? {
         return getTypeConverter().findCustomEditor(requiredType)
     }
 
-    override fun <T : Any> convertIfNecessary(value: Any?, requiredType: Class<T>?): T? {
-        return getTypeConverter().convertIfNecessary(value, requiredType)
+    override fun <T : Any> convertIfNecessary(
+        value: Any?,
+        requiredType: Class<T>?,
+        methodParameter: MethodParameter?
+    ): T? {
+        return getTypeConverter().convertIfNecessary(value, requiredType, methodParameter)
+    }
+
+    override fun <T : Any> convertIfNecessary(value: Any?, requiredType: Class<T>?, field: Field?): T? {
+        return getTypeConverter().convertIfNecessary(value, requiredType, field)
     }
 
     /**

@@ -1,6 +1,9 @@
 package com.wanna.framework.beans
 
+import com.wanna.framework.core.MethodParameter
+import com.wanna.framework.core.convert.TypeDescriptor
 import com.wanna.framework.lang.Nullable
+import java.lang.reflect.Field
 import kotlin.jvm.Throws
 
 /**
@@ -17,4 +20,30 @@ interface TypeConverter {
     @Throws(TypeMismatchException::class)
     @Nullable
     fun <T : Any> convertIfNecessary(@Nullable value: Any?, @Nullable requiredType: Class<T>?): T?
+
+    @Throws(TypeMismatchException::class)
+    @Nullable
+    fun <T : Any> convertIfNecessary(
+        @Nullable value: Any?,
+        @Nullable requiredType: Class<T>?,
+        @Nullable methodParameter: MethodParameter?
+    ): T?
+
+    @Throws(TypeMismatchException::class)
+    @Nullable
+    fun <T : Any> convertIfNecessary(
+        @Nullable value: Any?,
+        @Nullable requiredType: Class<T>?,
+        @Nullable field: Field?
+    ): T?
+
+    @Throws(TypeMismatchException::class)
+    @Nullable
+    fun <T : Any> convertIfNecessary(
+        @Nullable value: Any?,
+        @Nullable requiredType: Class<T>?,
+        @Nullable typeDescriptor: TypeDescriptor?
+    ): T? {
+        throw UnsupportedOperationException("TypeDescriptor resolution not supported")
+    }
 }

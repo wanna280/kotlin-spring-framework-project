@@ -396,4 +396,35 @@ object StringUtils {
         delim ?: return arrayOf(str)
         return str.trim().split(delim).filter { hasText(it) }.toTypedArray()
     }
+
+    /**
+     * 将指定的数组当中的元素, 使用","去拼接成为一个字符串
+     *
+     * @param arr 待拼接成为字符串的数组
+     * @return 使用","拼接成为字符串之后的结果
+     */
+    @JvmStatic
+    fun arrayToCommaDelimitedString(@Nullable arr: Array<out Any>?): String {
+        return arrayToDelimitedString(arr, ",");
+    }
+
+    /**
+     * 将数组当中的元素, 使用指定的分隔符, 去拼接成为字符串
+     *
+     * @param arr 待拼接成为字符串的数组
+     * @param delim 元素分隔符(比如",")
+     * @return 拼接成为字符串之后的结果
+     */
+    @JvmStatic
+    fun arrayToDelimitedString(@Nullable arr: Array<out Any>?, delim: String): String {
+        if (arr == null || arr.isEmpty()) {
+            return ""
+        }
+        if (arr.size == 1) {
+            return arr[0].toString()
+        }
+        val joiner = StringJoiner(delim)
+        arr.forEach { joiner.add(it.toString()) }
+        return joiner.toString()
+    }
 }

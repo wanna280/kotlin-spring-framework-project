@@ -38,5 +38,5 @@ interface PropertyEditorRegistry {
      * @param requiredType 想要去编辑的类型
      * @return 如果针对想要编辑的类型(requiredType)找到了合适的[PropertyEditor], 那么return; 如果找不到, 那么直接return null
      */
-    fun findCustomEditor(requiredType: Class<*>): PropertyEditor?
+    fun findCustomEditor(requiredType: Class<*>?): PropertyEditor?
 }

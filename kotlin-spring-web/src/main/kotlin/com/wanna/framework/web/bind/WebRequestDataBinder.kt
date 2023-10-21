@@ -1,6 +1,5 @@
 package com.wanna.framework.web.bind
 
-import com.wanna.framework.beans.BeanWrapperImpl
 import com.wanna.framework.beans.MutablePropertyValues
 import com.wanna.framework.web.context.request.NativeWebRequest
 import com.wanna.framework.web.server.HttpServerRequest
@@ -19,16 +18,14 @@ open class WebRequestDataBinder(target: Any?, objectName: String) : WebDataBinde
      * @param request request
      */
     open fun bind(request: NativeWebRequest) {
-        if (getTarget() == null) {
-            return
-        }
+        getTarget() ?: return
+
         val serverRequest = request.getNativeRequest(HttpServerRequest::class.java)
 
         // 将ParamMap转换为MutablePropertyValues
-        val mutablePropertyValues = MutablePropertyValues(serverRequest.getParamMap())
-        val beanWrapper = BeanWrapperImpl(getTarget() ?: throw IllegalStateException("target cannot be null"))
-        beanWrapper.setConversionService(getConversionService())
-        // 设置PropertyValues
-        beanWrapper.setPropertyValues(mutablePropertyValues)
+        val mpvs = MutablePropertyValues(serverRequest.getParamMap())
+
+        // 执行对于属性值mpvs的绑定
+        doBind(mpvs)
     }
 }

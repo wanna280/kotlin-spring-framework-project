@@ -11,6 +11,20 @@ import kotlin.jvm.Throws
 interface BeanWrapper : ConfigurablePropertyAccessor {
 
     /**
+     * 设置集合的自动增长的限制
+     *
+     * @param autoGrowCollectionLimit 集合的自动增长的限制
+     */
+    fun setAutoGrowCollectionLimit(autoGrowCollectionLimit: Int)
+
+    /**
+     * 获取集合的自动增长的限制
+     *
+     * @return 集合的自动增长的限制
+     */
+    fun getAutoGrowCollectionLimit(): Int
+
+    /**
      * 获取到包装的对象实例
      *
      * @return 包装的对象实例

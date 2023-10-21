@@ -1,10 +1,11 @@
 package com.wanna.framework.beans
 
+import com.wanna.framework.lang.Nullable
 import com.wanna.framework.util.ClassUtils
 import java.beans.PropertyChangeEvent
 
 /**
- * 它是属性访问异常的其中一种特殊情况, 属于是类型转换不匹配的情况; 
+ * 它是属性访问异常的其中一种特殊情况, 属于是类型转换不匹配的情况;
  * 当从一种类型转换成为另外一种类型失败时, 就会出现这个异常
  *
  * @author jianchao.jia
@@ -19,13 +20,13 @@ import java.beans.PropertyChangeEvent
  */
 open class TypeMismatchException
 private constructor(
-    propertyChangeEvent: PropertyChangeEvent?,
-    message: String?,
-    cause: Throwable?,
-    val value: Any?,
-    val requiredType: Class<*>
+    @Nullable propertyChangeEvent: PropertyChangeEvent?,
+    @Nullable message: String?,
+    @Nullable cause: Throwable?,
+    @Nullable val value: Any?,
+    @Nullable val requiredType: Class<*>?
 ) : PropertyAccessException(propertyChangeEvent, message, cause) {
-    constructor(value: Any, requiredType: Class<*>, cause: Throwable?) : this(null, null, cause, value, requiredType)
+    constructor(value: Any?, requiredType: Class<*>?, cause: Throwable?) : this(null, null, cause, value, requiredType)
 
     constructor(value: Any, requiredType: Class<*>) : this(
         null, "类型不匹配！给定的对象类型为[${ClassUtils.getQualifiedName(value.javaClass)}]," +

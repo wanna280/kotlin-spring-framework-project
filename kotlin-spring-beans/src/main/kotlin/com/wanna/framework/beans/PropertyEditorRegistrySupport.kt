@@ -38,8 +38,23 @@ open class PropertyEditorRegistrySupport : PropertyEditorRegistry {
         customEditors[requiredType] = propertyEditor
     }
 
-    override fun findCustomEditor(requiredType: Class<*>): PropertyEditor? {
+    @Nullable
+    override fun findCustomEditor(requiredType: Class<*>?): PropertyEditor? {
         return customEditors?.get(requiredType)
+    }
+
+    /**
+     * 为给定的[requiredType]去找到默认的[PropertyEditor]
+     *
+     * @param requiredType requiredType
+     * @return 针对该类型去进行处理的PropertyEditor
+     */
+    @Nullable
+    open fun getDefaultEditor(requiredType: Class<*>): PropertyEditor? {
+        if (this.defaultEditors == null) {
+            createDefaultEditors()
+        }
+        return this.defaultEditors?.get(requiredType)
     }
 
     /**

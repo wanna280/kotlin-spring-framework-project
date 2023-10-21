@@ -56,7 +56,8 @@ open class GenericConversionService : ConfigurableConversionService {
      * @param targetType targetType
      * @return 是否能支持从sourceType->targetType?
      */
-    override fun canConvert(sourceType: TypeDescriptor, targetType: TypeDescriptor): Boolean {
+    override fun canConvert(@Nullable sourceType: TypeDescriptor?, targetType: TypeDescriptor): Boolean {
+        sourceType ?: return true
         val converter = getConverter(sourceType, targetType)
         return converter != null
     }
