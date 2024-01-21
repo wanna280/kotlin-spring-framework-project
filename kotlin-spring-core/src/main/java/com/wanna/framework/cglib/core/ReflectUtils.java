@@ -74,11 +74,8 @@ public class ReflectUtils {
             } catch (NoSuchMethodException ex) {
                 lookupDefineClass = null;
             }
-
-            classLoaderDefineClass = ClassLoader.class.getDeclaredMethod("defineClass",
-                    String.class, byte[].class, Integer.TYPE, Integer.TYPE, ProtectionDomain.class);
-
-            protectionDomain = getProtectionDomain(ReflectUtils.class);
+            classLoaderDefineClass = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, Integer.TYPE, Integer.TYPE, ProtectionDomain.class);
+            protectionDomain = ReflectUtils.class.getProtectionDomain();
 
             Method[] methods = Object.class.getDeclaredMethods();
             for (Method method : methods) {
@@ -231,9 +228,9 @@ public class ReflectUtils {
             return Class.forName(prefix + className + suffix, false, loader);
         } catch (ClassNotFoundException ignore) {
         }
-        for (String pack : packages) {
+        for (String aPackage : packages) {
             try {
-                return Class.forName(prefix + pack + '.' + className + suffix, false, loader);
+                return Class.forName(prefix + aPackage + '.' + className + suffix, false, loader);
             } catch (ClassNotFoundException ignore) {
             }
         }
@@ -270,9 +267,7 @@ public class ReflectUtils {
                 cstruct.setAccessible(true);
             }
             return cstruct.newInstance(args);
-        } catch (InstantiationException e) {
-            throw new CodeGenerationException(e);
-        } catch (IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             throw new CodeGenerationException(e);
         } catch (InvocationTargetException e) {
             throw new CodeGenerationException(e.getTargetException());
@@ -353,13 +348,14 @@ public class ReflectUtils {
                 return all;
             }
             List properties = new ArrayList(all.length);
-            for (PropertyDescriptor pd : all) {
+            for (int i = 0; i < all.length; i++) {
+                PropertyDescriptor pd = all[i];
                 if ((read && pd.getReadMethod() != null) ||
                         (write && pd.getWriteMethod() != null)) {
                     properties.add(pd);
                 }
             }
-            return (PropertyDescriptor[]) properties.toArray(new PropertyDescriptor[0]);
+            return (PropertyDescriptor[]) properties.toArray(new PropertyDescriptor[properties.size()]);
         } catch (IntrospectionException e) {
             throw new CodeGenerationException(e);
         }
@@ -391,8 +387,8 @@ public class ReflectUtils {
             addAllMethods(superclass, list);
         }
         Class[] interfaces = type.getInterfaces();
-        for (Class itf : interfaces) {
-            addAllMethods(itf, list);
+        for (int i = 0; i < interfaces.length; i++) {
+            addAllMethods(interfaces[i], list);
         }
 
         return list;
