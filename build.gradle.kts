@@ -16,6 +16,8 @@ allprojects {
 
     apply {
         plugin("java")
+
+        // 可以通过命令"./gradlew publish --info"查看日志从而知道产物输出的位置
         plugin("maven-publish")  // Gradle7.0+, maven插件被移除, 现在使用maven-publish插件
         plugin("kotlin")
     }
@@ -35,6 +37,10 @@ allprojects {
                 }
                 from(components["java"])
             }
+        }
+
+        repositories {
+            mavenLocal()
         }
     }
 

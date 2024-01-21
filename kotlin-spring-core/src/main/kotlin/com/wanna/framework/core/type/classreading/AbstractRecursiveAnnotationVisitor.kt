@@ -1,12 +1,13 @@
 package com.wanna.framework.core.type.classreading
 
-import com.wanna.framework.asm.*
-import com.wanna.framework.lang.Nullable
-import com.wanna.framework.util.ReflectionUtils
 import com.wanna.common.logging.Logger
 import com.wanna.common.logging.LoggerFactory
+import com.wanna.framework.asm.AnnotationVisitor
+import com.wanna.framework.asm.SpringAsmInfo
+import com.wanna.framework.asm.Type
 import com.wanna.framework.core.annotation.AnnotationAttributes
-import java.security.AccessControlException
+import com.wanna.framework.lang.Nullable
+import com.wanna.framework.util.ReflectionUtils
 
 /**
  * 支持去进行递归访问注解的AnnotationVisitor
@@ -105,7 +106,7 @@ abstract class AbstractRecursiveAnnotationVisitor(
                 logger.error("Failed to classload enum type while reading annotation metadata", ex)
 
                 // 检查是否无法访问?
-            } else if (ex is IllegalAccessException || ex is AccessControlException) {
+            } else if (ex is IllegalAccessException) {
                 logger.debug("Could not access enum value while reading annotation metadata", ex)
             }
         }
