@@ -131,7 +131,7 @@ open class DependencyDescriptor protected constructor(
     open fun fallbackMatchAllowed(): Boolean = false
 
     /**
-     * 获得一个允许去进行fallback的匹配的[DependencyDescriptor]
+     * 获得一个允许去进行fallback的匹配的[DependencyDescriptor], fallback的情况下, 不对未知的泛型(比如不写泛型的Map)去进行匹配
      *
      * @return Fallback的DependencyDescriptor(重写了fallbackMatchAllowed方法, 允许去进行fallback的匹配)
      */

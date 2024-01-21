@@ -80,7 +80,7 @@ open class GenericTypeAwareAutowireCandidateResolver : BeanFactoryAware, SimpleA
             // 那么我们尽最大可能去进行寻找, 直接根据BeanDefinition的beanClass去进行解析
             if (targetType == null && rbd != null && rbd.hasBeanClass() && rbd.getFactoryMethodName() == null) {
                 val beanClass = rbd.getBeanClass()
-                if (ClassUtils.isAssignable(FactoryBean::class.java, beanClass)) {
+                if (!ClassUtils.isAssignable(FactoryBean::class.java, beanClass)) {
                     targetType = ResolvableType.forClass(beanClass)
                 }
             }
@@ -91,7 +91,10 @@ open class GenericTypeAwareAutowireCandidateResolver : BeanFactoryAware, SimpleA
         if (cacheType) {
             rbd?.targetType = targetType
         }
-        if (descriptor.fallbackMatchAllowed() && targetType.resolve() == Properties::class.java) {
+        // 如果允许fallback匹配, 那么如果有不写泛型的元素, 正常情况下Map<String, String>, 但是对于不写泛型的Map这种情况, 直接认为算是匹配
+        if (descriptor.fallbackMatchAllowed() &&
+            (targetType.hasUnresolvableGenerics() || targetType.resolve() == Properties::class.java)
+        ) {
             return true
         }
 
