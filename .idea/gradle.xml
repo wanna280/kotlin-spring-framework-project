@@ -15,6 +15,7 @@
             <option value="$PROJECT_DIR$/kotlin-spring-aop" />
             <option value="$PROJECT_DIR$/kotlin-spring-beans" />
             <option value="$PROJECT_DIR$/kotlin-spring-context" />
+            <option value="$PROJECT_DIR$/kotlin-spring-context-indexer" />
             <option value="$PROJECT_DIR$/kotlin-spring-core" />
             <option value="$PROJECT_DIR$/kotlin-spring-instrument" />
             <option value="$PROJECT_DIR$/kotlin-spring-jcl" />

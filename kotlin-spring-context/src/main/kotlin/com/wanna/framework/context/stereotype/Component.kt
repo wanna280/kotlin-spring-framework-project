@@ -8,6 +8,7 @@ package com.wanna.framework.context.stereotype
  * @see Controller
  * @see Repository
  */
+@Indexed
 @Target(AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.CLASS, AnnotationTarget.TYPE)
 annotation class Component(
     val value: String = ""
